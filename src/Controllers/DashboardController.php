@@ -8,10 +8,7 @@ use KazSign\Core\Controller;
 use KazSign\Core\Database;
 
 /**
- * DashboardController — home page.
- *
- * Delegates all real logic to DocumentController::index().
- * Kept as a separate class so the route table stays semantic.
+ * DashboardController — loads role-specific data and renders the single dashboard.php view.
  */
 final class DashboardController extends Controller
 {
@@ -20,31 +17,100 @@ final class DashboardController extends Controller
     {
         $this->requireAuth();
 
+        $role   = $_SESSION['role'] ?? 'holder';
+        $userId = $this->authUserId();
+        $flash  = $this->consumeFlash();
+        $csrf   = $this->generateCsrfToken();
+
+        match ($role) {
+            'issuer'   => $this->renderIssuer($userId, $flash, $csrf),
+            'verifier' => $this->renderVerifier($flash, $csrf),
+            default    => $this->renderHolder($userId, $flash, $csrf),
+        };
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function renderIssuer(int $userId, ?array $flash, string $csrf): void
+    {
+        // Credentials this issuer has issued
         $stmt = Database::getInstance()->prepare(
-            'SELECT id, file_name, file_hash, signature, status, created_at
-               FROM documents
-              WHERE user_id = :uid
-           ORDER BY created_at DESC'
+            'SELECT c.*, u.username AS holder_name
+               FROM credentials c
+               JOIN users u ON u.id = c.holder_id
+              WHERE c.issuer_id = :uid
+           ORDER BY c.issued_at DESC'
         );
-        $stmt->execute([':uid' => $this->authUserId()]);
-        $documents = $stmt->fetchAll();
+        $stmt->execute([':uid' => $userId]);
+        $credentials = $stmt->fetchAll() ?: [];
 
-        $flash = null;
-        if (!empty($_SESSION['flash'])) {
-            $flash = $_SESSION['flash'];
-            unset($_SESSION['flash']);
-        }
-
-        $csrfToken = $_SESSION['csrf_token'] ?? '';
-        if ($csrfToken === '') {
-            $csrfToken = bin2hex(random_bytes(32));
-            $_SESSION['csrf_token'] = $csrfToken;
-        }
+        // All holders available to issue to
+        $stmt = Database::getInstance()->prepare(
+            'SELECT u.id, u.username, h.full_name, h.id_number
+               FROM users u
+               JOIN holders h ON h.user_id = u.id
+              WHERE u.role = :role'
+        );
+        $stmt->execute([':role' => 'holder']);
+        $holders = $stmt->fetchAll() ?: [];
 
         $this->render('dashboard', [
-            'documents'  => $documents,
-            'flash'      => $flash,
-            'csrf_token' => $csrfToken,
+            'credentials' => $credentials,
+            'holders'     => $holders,
+            'flash'       => $flash,
+            'csrf_token'  => $csrf,
+            'result'      => null,
         ]);
+    }
+
+    private function renderHolder(int $userId, ?array $flash, string $csrf): void
+    {
+        // Credentials issued TO this holder
+        $stmt = Database::getInstance()->prepare(
+            'SELECT c.*, u.username AS issuer_name
+               FROM credentials c
+               JOIN users u ON u.id = c.issuer_id
+              WHERE c.holder_id = :uid
+           ORDER BY c.issued_at DESC'
+        );
+        $stmt->execute([':uid' => $userId]);
+        $credentials = $stmt->fetchAll() ?: [];
+
+        $this->render('dashboard', [
+            'credentials' => $credentials,
+            'holders'     => [],
+            'flash'       => $flash,
+            'csrf_token'  => $csrf,
+            'result'      => null,
+        ]);
+    }
+
+    private function renderVerifier(?array $flash, string $csrf): void
+    {
+        $this->render('dashboard', [
+            'credentials' => [],
+            'holders'     => [],
+            'flash'       => $flash,
+            'csrf_token'  => $csrf,
+            'result'      => null,
+        ]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function generateCsrfToken(): string
+    {
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    private function consumeFlash(): ?array
+    {
+        if (!isset($_SESSION['flash'])) return null;
+        $flash = $_SESSION['flash'];
+        unset($_SESSION['flash']);
+        return $flash;
     }
 }

@@ -46,3 +46,27 @@ CREATE TABLE IF NOT EXISTS documents (
     INDEX idx_documents_user_id (user_id),
     INDEX idx_documents_status  (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Table: credentials (JSON-LD Verifiable Credentials)
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS credentials (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    issuer_id     INT UNSIGNED NOT NULL COMMENT 'user_id of the issuer',
+    holder_id     INT UNSIGNED NOT NULL COMMENT 'user_id of the holder',
+    credential_id VARCHAR(255) NOT NULL COMMENT 'unique URI id in the JSON-LD',
+    subject       TEXT         NOT NULL COMMENT 'JSON-LD credential subject data',
+    jsonld        LONGTEXT     NOT NULL COMMENT 'full signed JSON-LD credential',
+    signature     TEXT         NOT NULL COMMENT 'KAZ-SIGN hex signature',
+    file_hash     VARCHAR(64)  NOT NULL COMMENT 'SHA-256 of the jsonld field',
+    status        ENUM('issued','verified','rejected') NOT NULL DEFAULT 'issued',
+    issued_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_credential_id (credential_id),
+    CONSTRAINT fk_credentials_issuer FOREIGN KEY (issuer_id) REFERENCES users (id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_credentials_holder FOREIGN KEY (holder_id) REFERENCES users (id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_credentials_holder (holder_id),
+    INDEX idx_credentials_issuer (issuer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
