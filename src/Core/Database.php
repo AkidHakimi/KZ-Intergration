@@ -12,8 +12,6 @@ use PDOException;
  *
  * Automatically falls back to a session-based store when MySQL is
  * unavailable (DB_SKIP=true in .env, or connection fails).
- *
- * Extra method: lastInsertId() works in both real and stub mode.
  */
 final class Database
 {
@@ -79,9 +77,7 @@ final class Database
         return $this->stubMode;
     }
 
-    /**
-     * Works in both real MySQL mode and stub mode.
-     */
+    /** Works in both real MySQL mode and stub mode. */
     public function lastInsertId(): int
     {
         if ($this->stubMode) {
@@ -90,9 +86,7 @@ final class Database
         return (int) $this->connection->lastInsertId();
     }
 
-    /**
-     * Prepare a statement — returns a real PDOStatement or StubStatement.
-     */
+    /** Prepare a statement — returns a real PDOStatement or StubStatement. */
     public function prepare(string $sql): \PDOStatement|StubStatement
     {
         if ($this->stubMode) {
@@ -101,15 +95,11 @@ final class Database
         return $this->connection->prepare($sql);
     }
 
-    /**
-     * Called by StubStatement after an INSERT to record the new ID.
-     */
+    /** Called by StubStatement after an INSERT to record the new ID. */
     public function setLastInsertId(int $id): void
     {
         $this->lastId = $id;
     }
-
-    // ── Session store ─────────────────────────────────────────────────────────
 
     private function initSessionStore(): void
     {
@@ -153,12 +143,12 @@ class StubStatement
         $sql   = strtolower($this->sql);
         $store = &$_SESSION['__db'];
 
-        // ── INSERT ────────────────────────────────────────────────────────────
+        // INSERT
         if (str_starts_with($sql, 'insert into')) {
             preg_match('/insert into\s+(\w+)/i', $this->sql, $m);
             $table = $m[1] ?? '';
 
-            if (!isset($store[$table]))           $store[$table] = [];
+            if (!isset($store[$table]))              $store[$table] = [];
             if (!isset($store['__next_id'][$table])) $store['__next_id'][$table] = 1;
 
             $id  = $store['__next_id'][$table];
@@ -186,7 +176,7 @@ class StubStatement
             return true;
         }
 
-        // ── SELECT ────────────────────────────────────────────────────────────
+        // SELECT
         if (str_starts_with($sql, 'select')) {
             preg_match('/from\s+(\w+)/i', $this->sql, $m);
             $table = $m[1] ?? '';
@@ -217,7 +207,7 @@ class StubStatement
             return true;
         }
 
-        // ── UPDATE ────────────────────────────────────────────────────────────
+        // UPDATE
         if (str_starts_with($sql, 'update')) {
             preg_match('/update\s+(\w+)/i', $this->sql, $m);
             $table = $m[1] ?? '';

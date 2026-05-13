@@ -6,7 +6,6 @@ use KazSign\Core\Database;
 
 /**
  * Issuer — an entity that signs and issues documents.
- * Linked 1-to-1 with users (role = 'issuer').
  */
 class Issuer
 {
@@ -30,16 +29,17 @@ class Issuer
             'INSERT INTO issuers (user_id, organisation) VALUES (:uid, :org)'
         );
         $stmt->execute([':uid' => $userId, ':org' => $organisation]);
-        return (int) $db->getConnection()->lastInsertId();
+
+        // FIX: use $db->lastInsertId() not $db->getConnection()->lastInsertId()
+        return (int) $db->lastInsertId();
     }
 
-    /** All documents issued by this user. */
     public static function documents(int $userId): array
     {
         $stmt = Database::getInstance()->prepare(
             'SELECT * FROM documents WHERE user_id = :uid ORDER BY created_at DESC'
         );
         $stmt->execute([':uid' => $userId]);
-        return $stmt->fetchAll();
+        return $stmt->fetchAll() ?: [];
     }
 }

@@ -6,7 +6,6 @@ use KazSign\Core\Database;
 
 /**
  * Holder — the person a credential/document is issued about.
- * Linked 1-to-1 with users (role = 'holder').
  */
 class Holder
 {
@@ -31,16 +30,17 @@ class Holder
              VALUES (:uid, :name, :idn)'
         );
         $stmt->execute([':uid' => $userId, ':name' => $fullName, ':idn' => $idNumber]);
-        return (int) $db->getConnection()->lastInsertId();
+
+        // FIX: use $db->lastInsertId() not $db->getConnection()->lastInsertId()
+        return (int) $db->lastInsertId();
     }
 
-    /** All documents owned by this holder. */
     public static function documents(int $userId): array
     {
         $stmt = Database::getInstance()->prepare(
             'SELECT * FROM documents WHERE user_id = :uid ORDER BY created_at DESC'
         );
         $stmt->execute([':uid' => $userId]);
-        return $stmt->fetchAll();
+        return $stmt->fetchAll() ?: [];
     }
 }
