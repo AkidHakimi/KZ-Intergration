@@ -1,0 +1,11 @@
+Options -Indexes
+
+# ── Front-controller rewrite ─────────────────────────────────────────────────
+RewriteEngine On
+
+# Let real files and directories pass through unchanged.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Everything else → public/index.php
+RewriteRule ^ index.php [QSA,L]
