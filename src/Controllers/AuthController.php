@@ -9,7 +9,7 @@ use KazSign\Core\Database;
 use KazSign\Core\KazSignEngine;
 
 /**
- * AuthController — registration, login, logout, and private-key handoff.
+ * AuthController — registration (with role), login, logout, key handoff.
  */
 final class AuthController extends Controller
 {
@@ -20,9 +20,7 @@ final class AuthController extends Controller
     /** GET /register */
     public function registerForm(array $_params = []): void
     {
-        if ($this->authUserId()) {
-            $this->redirect('/');
-        }
+        if ($this->authUserId()) $this->redirect('/');
 
         $this->render('auth.register', [
             'csrf_token' => $this->generateCsrfToken(),
@@ -33,18 +31,26 @@ final class AuthController extends Controller
     /** POST /register */
     public function register(array $_params = []): void
     {
-        if ($this->authUserId()) {
-            $this->redirect('/');
-        }
+        if ($this->authUserId()) $this->redirect('/');
 
         $this->validateCsrf();
 
-        $username = trim($_POST['username'] ?? '');
-        $email    = trim($_POST['email']    ?? '');
-        $password =       $_POST['password'] ?? '';
+        $username     = trim($_POST['username']     ?? '');
+        $email        = trim($_POST['email']        ?? '');
+        $password     =      $_POST['password']     ?? '';
+        $role         = trim($_POST['role']         ?? 'holder');
+        $organisation = trim($_POST['organisation'] ?? '');
+        $fullName     = trim($_POST['full_name']    ?? '');
+        $idNumber     = trim($_POST['id_number']    ?? '');
 
+        // ── Validation ────────────────────────────────────────────────────────
         if ($username === '' || $email === '' || $password === '') {
-            $this->setFlash('error', 'All fields are required.');
+            $this->setFlash('error', 'Username, email and password are required.');
+            $this->redirect('/register');
+        }
+
+        if (!in_array($role, ['issuer', 'holder', 'verifier'], true)) {
+            $this->setFlash('error', 'Invalid role selected.');
             $this->redirect('/register');
         }
 
@@ -53,8 +59,18 @@ final class AuthController extends Controller
             $this->redirect('/register');
         }
 
-        if (\strlen($password) < 8) {
+        if (strlen($password) < 8) {
             $this->setFlash('error', 'Password must be at least 8 characters.');
+            $this->redirect('/register');
+        }
+
+        if (in_array($role, ['issuer', 'verifier'], true) && $organisation === '') {
+            $this->setFlash('error', 'Organisation name is required for Issuer / Verifier.');
+            $this->redirect('/register');
+        }
+
+        if ($role === 'holder' && ($fullName === '' || $idNumber === '')) {
+            $this->setFlash('error', 'Full name and ID number are required for Holder.');
             $this->redirect('/register');
         }
 
@@ -62,23 +78,48 @@ final class AuthController extends Controller
         $engine  = new KazSignEngine();
         $keyPair = $engine->generateKeyPair();
 
-        // ── Persist user ──────────────────────────────────────────────────────
         $db = Database::getInstance();
 
         try {
+            // Insert into users (with role)
             $stmt = $db->prepare(
-                'INSERT INTO users (username, email, password, public_key)
-                 VALUES (:username, :email, :password, :public_key)'
+                'INSERT INTO users (username, email, role, password, public_key)
+                 VALUES (:username, :email, :role, :password, :public_key)'
             );
             $stmt->execute([
                 ':username'   => $username,
                 ':email'      => $email,
+                ':role'       => $role,
                 ':password'   => password_hash($password, PASSWORD_BCRYPT),
                 ':public_key' => $keyPair['public_key'],
             ]);
 
-            // Works in both real MySQL and stub mode
             $userId = $db->lastInsertId();
+
+            // Insert into role-specific table
+            if ($role === 'issuer') {
+                $stmt = $db->prepare(
+                    'INSERT INTO issuers (user_id, organisation) VALUES (:uid, :org)'
+                );
+                $stmt->execute([':uid' => $userId, ':org' => $organisation]);
+
+            } elseif ($role === 'holder') {
+                $stmt = $db->prepare(
+                    'INSERT INTO holders (user_id, full_name, id_number)
+                     VALUES (:uid, :name, :idn)'
+                );
+                $stmt->execute([
+                    ':uid'  => $userId,
+                    ':name' => $fullName,
+                    ':idn'  => $idNumber,
+                ]);
+
+            } elseif ($role === 'verifier') {
+                $stmt = $db->prepare(
+                    'INSERT INTO verifiers (user_id, organisation) VALUES (:uid, :org)'
+                );
+                $stmt->execute([':uid' => $userId, ':org' => $organisation]);
+            }
 
         } catch (\PDOException $e) {
             if (str_contains($e->getMessage(), '1062')) {
@@ -90,24 +131,24 @@ final class AuthController extends Controller
             $this->redirect('/register');
         }
 
-        // ── Start session, then redirect to key-save page ─────────────────────
+        // ── Start session ─────────────────────────────────────────────────────
         session_regenerate_id(delete_old_session: true);
         $_SESSION['user_id']     = $userId;
         $_SESSION['username']    = $username;
+        $_SESSION['role']        = $role;
         $_SESSION['private_key'] = $keyPair['private_key'];
 
         $this->redirect('/key');
     }
 
     // -------------------------------------------------------------------------
-    // Private-key save page
+    // Key save page
     // -------------------------------------------------------------------------
 
     /** GET /key */
     public function saveKeyPage(array $_params = []): void
     {
         $this->requireAuth();
-
         $this->render('auth.save_key', [
             'private_key' => $_SESSION['private_key'] ?? '',
             'csrf_token'  => $this->generateCsrfToken(),
@@ -119,7 +160,6 @@ final class AuthController extends Controller
     {
         $this->requireAuth();
         $this->validateCsrf();
-
         $this->setFlash('success', 'Welcome! Your key pair is active for this session.');
         $this->redirect('/');
     }
@@ -131,9 +171,7 @@ final class AuthController extends Controller
     /** GET /login */
     public function loginForm(array $_params = []): void
     {
-        if ($this->authUserId()) {
-            $this->redirect('/');
-        }
+        if ($this->authUserId()) $this->redirect('/');
 
         $this->render('auth.login', [
             'csrf_token' => $this->generateCsrfToken(),
@@ -144,9 +182,7 @@ final class AuthController extends Controller
     /** POST /login */
     public function login(array $_params = []): void
     {
-        if ($this->authUserId()) {
-            $this->redirect('/');
-        }
+        if ($this->authUserId()) $this->redirect('/');
 
         $this->validateCsrf();
 
@@ -159,9 +195,9 @@ final class AuthController extends Controller
             $this->redirect('/login');
         }
 
-        // ── Verify credentials ────────────────────────────────────────────────
+        // ── Fetch user + role ─────────────────────────────────────────────────
         $stmt = Database::getInstance()->prepare(
-            'SELECT id, username, password FROM users WHERE username = :u LIMIT 1'
+            'SELECT id, username, password, role FROM users WHERE username = :u LIMIT 1'
         );
         $stmt->execute([':u' => $username]);
         $user = $stmt->fetch();
@@ -171,7 +207,6 @@ final class AuthController extends Controller
             $this->redirect('/login');
         }
 
-        // ── Validate private key format if provided ───────────────────────────
         if ($privateKey !== '' && !str_starts_with($privateKey, 'KAZSIGN-PRV-v1::')) {
             $this->setFlash('error', 'Invalid private key format. It must start with KAZSIGN-PRV-v1::');
             $this->redirect('/login');
@@ -181,10 +216,11 @@ final class AuthController extends Controller
         session_regenerate_id(delete_old_session: true);
         $_SESSION['user_id']     = (int) $user['id'];
         $_SESSION['username']    = $user['username'];
+        $_SESSION['role']        = $user['role'];           // ← role saved here
         $_SESSION['private_key'] = $privateKey !== '' ? $privateKey : null;
 
         $msg = $privateKey !== ''
-            ? "Welcome back, {$user['username']}! Private key loaded — signing enabled."
+            ? "Welcome back, {$user['username']}! Signed in as {$user['role']}."
             : "Welcome back, {$user['username']}! No private key — verify-only mode.";
 
         $this->setFlash('success', $msg);
@@ -204,7 +240,7 @@ final class AuthController extends Controller
     }
 
     // -------------------------------------------------------------------------
-    // Helpers (kept private — base Controller has protected versions too)
+    // Helpers
     // -------------------------------------------------------------------------
 
     private function generateCsrfToken(): string
