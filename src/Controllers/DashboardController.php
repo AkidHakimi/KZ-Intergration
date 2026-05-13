@@ -8,7 +8,7 @@ use KazSign\Core\Controller;
 use KazSign\Core\Database;
 
 /**
- * DashboardController — loads role-specific data and renders the single dashboard.php view.
+ * DashboardController — loads role-specific data, renders single dashboard.php
  */
 final class DashboardController extends Controller
 {
