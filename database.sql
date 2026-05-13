@@ -52,21 +52,19 @@ CREATE TABLE IF NOT EXISTS documents (
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS credentials (
     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    issuer_id     INT UNSIGNED NOT NULL COMMENT 'user_id of the issuer',
-    holder_id     INT UNSIGNED NOT NULL COMMENT 'user_id of the holder',
-    credential_id VARCHAR(255) NOT NULL COMMENT 'unique URI id in the JSON-LD',
-    subject       TEXT         NOT NULL COMMENT 'JSON-LD credential subject data',
-    jsonld        LONGTEXT     NOT NULL COMMENT 'full signed JSON-LD credential',
-    signature     TEXT         NOT NULL COMMENT 'KAZ-SIGN hex signature',
-    file_hash     VARCHAR(64)  NOT NULL COMMENT 'SHA-256 of the jsonld field',
+    issuer_id     INT UNSIGNED NOT NULL,
+    holder_id     INT UNSIGNED NOT NULL,
+    credential_id VARCHAR(191) NOT NULL,
+    subject       TEXT         NOT NULL,
+    jsonld        LONGTEXT     NOT NULL,
+    signature     TEXT         NOT NULL,
+    file_hash     VARCHAR(64)  NOT NULL,
     status        ENUM('issued','verified','rejected') NOT NULL DEFAULT 'issued',
     issued_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_credential_id (credential_id),
-    CONSTRAINT fk_credentials_issuer FOREIGN KEY (issuer_id) REFERENCES users (id)
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_credentials_holder FOREIGN KEY (holder_id) REFERENCES users (id)
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    INDEX idx_credentials_holder (holder_id),
-    INDEX idx_credentials_issuer (issuer_id)
+    CONSTRAINT fk_cred_issuer FOREIGN KEY (issuer_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_cred_holder FOREIGN KEY (holder_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_cred_issuer (issuer_id),
+    INDEX idx_cred_holder (holder_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
