@@ -10,11 +10,10 @@ use PDOException;
 /**
  * Database – Singleton PDO wrapper.
  *
- * Supports THREE modes depending on .env settings:
- *
- *   1. SQLite  (DB_DRIVER=sqlite) — single file, no server needed  ← NEW
- *   2. MySQL   (DB_DRIVER=mysql)  — uses phpMyAdmin / XAMPP MySQL
- *   3. Session (DB_SKIP=true)     — browser session only, no persistence
+ * Three modes:
+ *   DB_DRIVER=sqlite → SQLite file in storage/kaz_sign.db
+ *   DB_DRIVER=mysql  → MySQL via XAMPP
+ *   DB_SKIP=true     → Session only (demo)
  */
 final class Database
 {
@@ -31,14 +30,13 @@ final class Database
 
     private function __construct()
     {
-        // ── Session stub mode ─────────────────────────────────────────────────
         if (getenv('DB_SKIP') === 'true') {
             $this->stubMode = true;
             $this->initSessionStore();
             return;
         }
 
-        $driver = getenv('DB_DRIVER') ?: 'mysql';
+        $driver = getenv('DB_DRIVER') ?: 'sqlite';
 
         try {
             if ($driver === 'sqlite') {
@@ -46,44 +44,169 @@ final class Database
             } else {
                 $this->connectMySQL();
             }
-        } catch (PDOException $e) {
-            error_log('[KazSign] DB unavailable, using session fallback: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            error_log('[KazSign] DB connect failed: ' . $e->getMessage());
             $this->stubMode = true;
             $this->initSessionStore();
         }
     }
 
+    private function __clone() {}
+
+    public static function getInstance(): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
     // =========================================================================
-    //  Connection methods
+    //  SQLite connection
     // =========================================================================
 
     private function connectSQLite(): void
     {
-        // SQLite file lives at: project_root/storage/kaz_sign.db
-        $root    = dirname(__DIR__, 2); // go up from src/Core/ to project root
+        // Walk up from src/Core/ → src/ → project root
+        $root    = dirname(__DIR__, 2);
         $storage = $root . DIRECTORY_SEPARATOR . 'storage';
 
-        // Create storage folder if it doesn't exist
+        // Create storage folder if missing
         if (!is_dir($storage)) {
-            mkdir($storage, 0755, true);
+            if (!mkdir($storage, 0755, true)) {
+                throw new \RuntimeException(
+                    "Cannot create storage folder at: {$storage}\n" .
+                    "Please create it manually: mkdir storage"
+                );
+            }
         }
 
-        $dbFile = $storage . DIRECTORY_SEPARATOR . 'kaz_sign.db';
-        $exists = file_exists($dbFile);
+        if (!is_writable($storage)) {
+            throw new \RuntimeException(
+                "Storage folder is not writable: {$storage}\n" .
+                "Please give write permission to this folder."
+            );
+        }
 
-        $this->connection = new PDO('sqlite:' . $dbFile, null, null, self::PDO_OPTIONS);
+        $dbFile    = $storage . DIRECTORY_SEPARATOR . 'kaz_sign.db';
+        $isNewFile = !file_exists($dbFile);
 
-        // Enable WAL mode for better concurrent access
+        $this->connection = new PDO(
+            'sqlite:' . $dbFile,
+            null,
+            null,
+            self::PDO_OPTIONS
+        );
+
+        // Enable WAL mode and foreign keys
         $this->connection->exec('PRAGMA journal_mode=WAL');
         $this->connection->exec('PRAGMA foreign_keys=ON');
 
-        // Create tables if this is a fresh database
-        if (!$exists) {
+        // Auto-create schema on first run
+        if ($isNewFile) {
+            $this->createSQLiteSchema();
+            error_log('[KazSign] SQLite database created at: ' . $dbFile);
+        } else {
+            // Always ensure all tables exist (safe to run on existing db)
             $this->createSQLiteSchema();
         }
-
-        error_log('[KazSign] Connected to SQLite: ' . $dbFile);
     }
+
+    private function createSQLiteSchema(): void
+    {
+        // Users table
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS users (
+                id          INTEGER  PRIMARY KEY AUTOINCREMENT,
+                username    TEXT     NOT NULL,
+                email       TEXT     NOT NULL,
+                role        TEXT     NOT NULL DEFAULT 'holder',
+                password    TEXT     NOT NULL,
+                public_key  TEXT     NOT NULL,
+                did         TEXT,
+                created_at  TEXT     NOT NULL DEFAULT (datetime('now')),
+                updated_at  TEXT     NOT NULL DEFAULT (datetime('now'))
+            )
+        ");
+
+        // Unique indexes
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_username ON users(username)");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email    ON users(email)");
+
+        // Issuers table
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS issuers (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL,
+                organisation TEXT    NOT NULL,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_issuers_user ON issuers(user_id)");
+
+        // Holders table
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS holders (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                full_name   TEXT    NOT NULL,
+                id_number   TEXT    NOT NULL,
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_holders_user ON holders(user_id)");
+
+        // Verifiers table
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS verifiers (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL,
+                organisation TEXT    NOT NULL,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_verifiers_user ON verifiers(user_id)");
+
+        // Credentials table
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS credentials (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer_id     INTEGER NOT NULL,
+                holder_id     INTEGER NOT NULL,
+                credential_id TEXT    NOT NULL,
+                subject       TEXT    NOT NULL,
+                jsonld        TEXT    NOT NULL,
+                signature     TEXT    NOT NULL,
+                file_hash     TEXT    NOT NULL,
+                status        TEXT    NOT NULL DEFAULT 'issued',
+                issued_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (issuer_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (holder_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_credential_id ON credentials(credential_id)");
+
+        // Documents table
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS documents (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                file_name   TEXT    NOT NULL,
+                file_hash   TEXT    NOT NULL,
+                signature   TEXT    NOT NULL,
+                status      TEXT    NOT NULL DEFAULT 'pending',
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+    }
+
+    // =========================================================================
+    //  MySQL connection
+    // =========================================================================
 
     private function connectMySQL(): void
     {
@@ -97,107 +220,20 @@ final class Database
         $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
 
         $options = self::PDO_OPTIONS + [
-            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'",
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8mb4'",
         ];
 
         $this->connection = new PDO($dsn, $user, $pass, $options);
     }
 
     // =========================================================================
-    //  SQLite schema (auto-created on first run)
+    //  Public API
     // =========================================================================
-
-    private function createSQLiteSchema(): void
-    {
-        $this->connection->exec("
-            CREATE TABLE IF NOT EXISTS users (
-                id          INTEGER  PRIMARY KEY AUTOINCREMENT,
-                username    TEXT     NOT NULL UNIQUE,
-                email       TEXT     NOT NULL UNIQUE,
-                role        TEXT     NOT NULL DEFAULT 'holder'
-                                     CHECK(role IN ('issuer','holder','verifier')),
-                password    TEXT     NOT NULL,
-                public_key  TEXT     NOT NULL,
-                did         TEXT     NULL,
-                created_at  DATETIME NOT NULL DEFAULT (datetime('now')),
-                updated_at  DATETIME NOT NULL DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS issuers (
-                id           INTEGER  PRIMARY KEY AUTOINCREMENT,
-                user_id      INTEGER  NOT NULL UNIQUE
-                                      REFERENCES users(id) ON DELETE CASCADE,
-                organisation TEXT     NOT NULL,
-                created_at   DATETIME NOT NULL DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS holders (
-                id          INTEGER  PRIMARY KEY AUTOINCREMENT,
-                user_id     INTEGER  NOT NULL UNIQUE
-                                     REFERENCES users(id) ON DELETE CASCADE,
-                full_name   TEXT     NOT NULL,
-                id_number   TEXT     NOT NULL,
-                created_at  DATETIME NOT NULL DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS verifiers (
-                id           INTEGER  PRIMARY KEY AUTOINCREMENT,
-                user_id      INTEGER  NOT NULL UNIQUE
-                                      REFERENCES users(id) ON DELETE CASCADE,
-                organisation TEXT     NOT NULL,
-                created_at   DATETIME NOT NULL DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS credentials (
-                id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-                issuer_id     INTEGER  NOT NULL
-                                       REFERENCES users(id) ON DELETE CASCADE,
-                holder_id     INTEGER  NOT NULL
-                                       REFERENCES users(id) ON DELETE CASCADE,
-                credential_id TEXT     NOT NULL UNIQUE,
-                subject       TEXT     NOT NULL,
-                jsonld        TEXT     NOT NULL,
-                signature     TEXT     NOT NULL,
-                file_hash     TEXT     NOT NULL,
-                status        TEXT     NOT NULL DEFAULT 'issued'
-                                       CHECK(status IN ('issued','verified','rejected')),
-                issued_at     DATETIME NOT NULL DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS documents (
-                id          INTEGER  PRIMARY KEY AUTOINCREMENT,
-                user_id     INTEGER  NOT NULL
-                                     REFERENCES users(id) ON DELETE CASCADE,
-                file_name   TEXT     NOT NULL,
-                file_hash   TEXT     NOT NULL,
-                signature   TEXT     NOT NULL,
-                status      TEXT     NOT NULL DEFAULT 'pending'
-                                     CHECK(status IN ('pending','signed','verified','rejected')),
-                created_at  DATETIME NOT NULL DEFAULT (datetime('now'))
-            );
-        ");
-
-        error_log('[KazSign] SQLite schema created successfully.');
-    }
-
-    // =========================================================================
-    //  Public API (same interface as before — no other files need changing)
-    // =========================================================================
-
-    private function __clone() {}
-
-    public static function getInstance(): self
-    {
-        if (self::$instance === null) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
 
     public function getConnection(): PDO
     {
         if ($this->stubMode || $this->connection === null) {
-            throw new \RuntimeException('No real DB connection — running in stub mode.');
+            throw new \RuntimeException('No DB connection — running in stub mode.');
         }
         return $this->connection;
     }
@@ -209,17 +245,13 @@ final class Database
 
     public function lastInsertId(): int
     {
-        if ($this->stubMode) {
-            return $this->lastId;
-        }
+        if ($this->stubMode) return $this->lastId;
         return (int) $this->connection->lastInsertId();
     }
 
     public function prepare(string $sql): \PDOStatement|StubStatement
     {
-        if ($this->stubMode) {
-            return new StubStatement($sql, $this);
-        }
+        if ($this->stubMode) return new StubStatement($sql, $this);
         return $this->connection->prepare($sql);
     }
 
@@ -229,7 +261,7 @@ final class Database
     }
 
     // =========================================================================
-    //  Session stub (unchanged from before)
+    //  Session stub
     // =========================================================================
 
     private function initSessionStore(): void
@@ -249,7 +281,7 @@ final class Database
 }
 
 // =============================================================================
-//  StubStatement (session fallback — unchanged)
+//  StubStatement
 // =============================================================================
 
 class StubStatement
@@ -286,9 +318,9 @@ class StubStatement
             if ($table === 'users') {
                 foreach ($store[$table] as $e) {
                     if (($e['username'] ?? '') === ($this->params['username'] ?? ''))
-                        throw new \PDOException("Duplicate entry '1062' username");
+                        throw new \PDOException("UNIQUE constraint failed: users.username");
                     if (($e['email'] ?? '') === ($this->params['email'] ?? ''))
-                        throw new \PDOException("Duplicate entry '1062' email");
+                        throw new \PDOException("UNIQUE constraint failed: users.email");
                 }
             }
             $store[$table][] = $row;
@@ -302,9 +334,10 @@ class StubStatement
             preg_match('/from\s+(\w+)/i', $this->sql, $m);
             $table = $m[1] ?? '';
             $rows  = $store[$table] ?? [];
-            if (isset($this->params['id']))  $rows = array_values(array_filter($rows, fn($r) => (int)($r['id'] ?? 0) === (int)$this->params['id']));
-            if (isset($this->params['uid'])) $rows = array_values(array_filter($rows, fn($r) => (int)($r['user_id'] ?? 0) === (int)$this->params['uid']));
-            if (isset($this->params['u']))   $rows = array_values(array_filter($rows, fn($r) => ($r['username'] ?? '') === $this->params['u']));
+            if (isset($this->params['id']))   $rows = array_values(array_filter($rows, fn($r) => (int)($r['id'] ?? 0) === (int)$this->params['id']));
+            if (isset($this->params['uid']))  $rows = array_values(array_filter($rows, fn($r) => (int)($r['user_id'] ?? 0) === (int)$this->params['uid']));
+            if (isset($this->params['u']))    $rows = array_values(array_filter($rows, fn($r) => ($r['username'] ?? '') === $this->params['u']));
+            if (isset($this->params['cid']))  $rows = array_values(array_filter($rows, fn($r) => ($r['credential_id'] ?? '') === $this->params['cid']));
             if (str_contains($sql, 'order by')) usort($rows, fn($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
             $this->rows = $rows;
             return true;
