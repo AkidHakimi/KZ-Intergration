@@ -212,65 +212,72 @@ final class KazSignEngine
     // =========================================================================
 
     private function runBinary(string $sub, array $args = []): string
-    {
-        $binary = $this->binaryPath(check: true);
+{
+    $root = dirname(__DIR__, 2);
 
-        if (PHP_OS_FAMILY === 'Windows') {
-            $wslPath = preg_replace('/^([A-Za-z]):\\\\/i', '/mnt/$1/', $binary);
-            $wslPath = str_replace('\\', '/', strtolower($wslPath));
-            $cmd = 'wsl ' . escapeshellarg($wslPath);
-        } else {
-            $cmd = escapeshellcmd($binary);
-        }
+    if (PHP_OS_FAMILY === 'Windows') {
+        // Build WSL path preserving original folder case
+        $wslRoot = str_replace('\\', '/', $root);
+        $wslRoot = preg_replace_callback('/^([A-Za-z]):/', function($m) {
+            return '/mnt/' . strtolower($m[1]);
+        }, $wslRoot);
 
-        $cmd .= ' ' . escapeshellarg($sub);
-        foreach ($args as $arg) {
-            $cmd .= ' ' . escapeshellarg($arg);
-        }
-        $cmd .= ' 2>&1';
-
-        $output = shell_exec($cmd);
-
-        if ($output === null) {
-            throw new \RuntimeException(
-                "kazsign-cli '{$sub}' produced no output. Check binary path and permissions."
-            );
-        }
-
-        return $output;
+        $binary = $wslRoot . '/kaz-sign-c/kazsign-cli';
+        $cmd    = 'wsl -d Ubuntu -u root ' . escapeshellarg($binary);
+    } else {
+        $binary = $root . '/kaz-sign-c/kazsign-cli';
+        $cmd    = escapeshellcmd($binary);
     }
+
+    $cmd .= ' ' . escapeshellarg($sub);
+    foreach ($args as $arg) {
+        $cmd .= ' ' . escapeshellarg($arg);
+    }
+    $cmd .= ' 2>&1';
+
+    $output = shell_exec($cmd);
+
+    if ($output === null || trim($output) === '') {
+        throw new \RuntimeException(
+            "kazsign-cli '{$sub}' produced no output.\nCommand: {$cmd}"
+        );
+    }
+
+    return $output;
+}
 
     /**
      * @param bool $check  When true, throws if binary missing/not executable.
      *                     When false, just returns the path for existence checks.
      */
     private function binaryPath(bool $check = true): string
-    {
-        $root   = dirname(__DIR__, 2);
-        $binary = $root
-                . DIRECTORY_SEPARATOR . 'kaz-sign-c'
-                . DIRECTORY_SEPARATOR . self::BINARY_NAME;
+{
+    $root = dirname(__DIR__, 2);
 
-        if ($check) {
-            if (!is_file($binary)) {
-                throw new \RuntimeException(
-                    "kazsign-cli binary not found at: {$binary}\n" .
-                    "Build it with:\n" .
-                    "  cd kaz-sign-c\n" .
-                    "  gcc kazsign_cli.c kaz_api.o sign.o rng.o -o kazsign-cli -lcrypto -lgmp -lm\n" .
-                    "  chmod +x kazsign-cli\n\n" .
-                    "Or add KAZSIGN_STUB=true to your .env to use stub mode for testing."
-                );
-            }
-            if (PHP_OS_FAMILY !== 'Windows' && !is_executable($binary)) {
-                throw new \RuntimeException(
-                    "kazsign-cli is not executable. Fix: chmod +x {$binary}"
-                );
-            }
-        }
-
-        return $binary;
+    // On Windows with WSL, use wsl to run the binary
+    if (PHP_OS_FAMILY === 'Windows') {
+        // Convert Windows path to WSL path with correct case
+        $wslPath = str_replace('\\', '/', $root);
+        $wslPath = preg_replace('/^([A-Za-z]):/', '/mnt/$1', $wslPath);
+        $wslPath = strtolower(substr($wslPath, 0, 5)) . substr($wslPath, 5);
+        $binary  = $wslPath . '/kaz-sign-c/kazsign-cli';
+    } else {
+        $binary = $root . '/kaz-sign-c/kazsign-cli';
     }
+
+    if ($check && PHP_OS_FAMILY === 'Windows') {
+        // Check using WSL
+        $exists = shell_exec('wsl -d Ubuntu -u root test -f ' . escapeshellarg($binary) . ' && echo YES || echo NO');
+        if (trim($exists) !== 'YES') {
+            throw new \RuntimeException(
+                "kazsign-cli not found at WSL path: {$binary}\n" .
+                "Make sure it was compiled in WSL."
+            );
+        }
+    }
+
+    return $binary;
+}
 
     // =========================================================================
     //  Key helpers
