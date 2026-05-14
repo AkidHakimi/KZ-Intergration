@@ -181,7 +181,8 @@ final class Database
                 jsonld        TEXT    NOT NULL,
                 signature     TEXT    NOT NULL,
                 file_hash     TEXT    NOT NULL,
-                status        TEXT    NOT NULL DEFAULT 'issued',
+                status        TEXT    NOT NULL DEFAULT 'issued'
+                CHECK(status IN ('issued','verified','rejected','revoked')),
                 issued_at     TEXT    NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (issuer_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (holder_id) REFERENCES users(id) ON DELETE CASCADE
