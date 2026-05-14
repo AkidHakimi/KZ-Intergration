@@ -65,7 +65,6 @@ final class KazSignEngine
 
     /**
      * Sign data with a private key.
-     * Returns a stub signature when the binary is not available.
      *
      * @param  string $data       Raw bytes to sign.
      * @param  string $privateKey KAZSIGN-PRV-v1::<hex> or KAZSIGN-PRV-v1::STUB-<hex>
@@ -92,7 +91,6 @@ final class KazSignEngine
 
     /**
      * Verify a signature against data and a public key.
-     * Stub keys verify correctly against stub signatures.
      *
      * @param  string $data      The original raw bytes.
      * @param  string $signature Hex signature from signData().
@@ -131,29 +129,38 @@ final class KazSignEngine
 
     /**
      * Returns whether stub mode is active.
-     * Stub mode is on when:
-     *   - KAZSIGN_STUB=true in .env, OR
-     *   - the binary file does not exist at its expected path
+     *
+     * KEY FIX: On Windows, is_file() cannot detect Linux ELF binaries in WSL.
+     * We use WSL itself to check if the binary exists.
      */
     private function isStubMode(): bool
     {
+        // Forced stub via .env
         if (getenv('KAZSIGN_STUB') === 'true') {
             return true;
         }
 
-        $binary = $this->binaryPath(check: false);
-        return !is_file($binary);
+        if (PHP_OS_FAMILY === 'Windows') {
+            // is_file() won't work for WSL Linux binaries from Windows PHP
+            // Use WSL to check if the binary file exists
+            $wslPath = $this->getWslBinaryPath();
+            $result  = shell_exec(
+                'wsl -d Ubuntu -u root -- test -f ' .
+                escapeshellarg($wslPath) .
+                ' && echo YES || echo NO 2>&1'
+            );
+            $found = trim((string)$result) === 'YES';
+            error_log('[KazSign] isStubMode WSL check: ' . $wslPath . ' = ' . ($found ? 'FOUND → real mode' : 'NOT FOUND → stub mode'));
+            return !$found;
+        }
+
+        // On Linux: check directly
+        return !is_file($this->getLinuxBinaryPath());
     }
 
-    /**
-     * Stub keypair — generates a random 32-byte pair, encodes as hex.
-     * Prefixed with STUB- so code can detect stub vs real keys.
-     */
     private function stubGenerateKeyPair(): array
     {
-        $seed = random_bytes(32);
-
-        // Derive public/private from the seed deterministically
+        $seed      = random_bytes(32);
         $privBytes = $seed;
         $pubBytes  = hash('sha256', $seed, binary: true);
 
@@ -163,47 +170,18 @@ final class KazSignEngine
         ];
     }
 
-    /**
-     * Stub sign — produces a deterministic HMAC-SHA256 signature.
-     * This is cryptographically sound for testing but NOT the real KAZ-SIGN algorithm.
-     */
     private function stubSign(string $data, string $keyPayload): string
     {
-        $keyHex = str_starts_with($keyPayload, 'STUB-')
-            ? substr($keyPayload, 5)
-            : $keyPayload;
-
+        $keyHex   = str_starts_with($keyPayload, 'STUB-') ? substr($keyPayload, 5) : $keyPayload;
         $keyBytes = hex2bin($keyHex) ?: $keyPayload;
         return hash_hmac('sha256', $data, $keyBytes);
     }
 
-    /**
-     * Stub verify — checks the HMAC produced by stubSign.
-     * Works correctly as long as the public key can be derived from the private key.
-     *
-     * The stub derive rule: pubkey hex = sha256(privkey bytes)
-     * So we look the private key material up by reversing the derivation.
-     * Since we only have the public key here, we re-verify by recomputing
-     * the expected signature using the SHA-256-derived signing key.
-     *
-     * For the stub, we store the expected signature in a session cache so
-     * verify() can check it without needing the private key.
-     */
     private function stubVerify(string $data, string $signature, string $pubKeyPayload): bool
     {
-        // Stub verification: check that the signature is a valid 64-char hex HMAC.
-        // We cannot re-derive the private key from the public key,
-        // so we verify by checking the signature is non-empty and looks like
-        // a valid HMAC-SHA256 (64 hex chars). The actual DB hash check in
-        // DocumentController::verify() catches real tampering.
         if (strlen($signature) !== 64 || !ctype_xdigit($signature)) {
             return false;
         }
-
-        // Additional check: signature must have been produced by THIS engine
-        // (not a random 64-char string). We accept it if the stored file hash
-        // in the DB matches — DocumentController already checks hash_equals()
-        // before calling us, so a stub true here is safe for testing.
         return true;
     }
 
@@ -212,72 +190,74 @@ final class KazSignEngine
     // =========================================================================
 
     private function runBinary(string $sub, array $args = []): string
-{
-    $root = dirname(__DIR__, 2);
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $binary = $this->getWslBinaryPath();
+            $cmd    = 'wsl -d Ubuntu -u root -- ' . escapeshellarg($binary);
+        } else {
+            $cmd = escapeshellcmd($this->getLinuxBinaryPath());
+        }
 
-    if (PHP_OS_FAMILY === 'Windows') {
-        // Build WSL path preserving original folder case
-        $wslRoot = str_replace('\\', '/', $root);
-        $wslRoot = preg_replace_callback('/^([A-Za-z]):/', function($m) {
-            return '/mnt/' . strtolower($m[1]);
-        }, $wslRoot);
+        $cmd .= ' ' . escapeshellarg($sub);
+        foreach ($args as $arg) {
+            $cmd .= ' ' . escapeshellarg($arg);
+        }
+        $cmd .= ' 2>&1';
 
-        $binary = $wslRoot . '/kaz-sign-c/kazsign-cli';
-        $cmd    = 'wsl -d Ubuntu -u root ' . escapeshellarg($binary);
-    } else {
-        $binary = $root . '/kaz-sign-c/kazsign-cli';
-        $cmd    = escapeshellcmd($binary);
-    }
+        error_log('[KazSign] CMD: ' . $cmd);
 
-    $cmd .= ' ' . escapeshellarg($sub);
-    foreach ($args as $arg) {
-        $cmd .= ' ' . escapeshellarg($arg);
-    }
-    $cmd .= ' 2>&1';
+        $output = shell_exec($cmd);
 
-    $output = shell_exec($cmd);
-
-    if ($output === null || trim($output) === '') {
-        throw new \RuntimeException(
-            "kazsign-cli '{$sub}' produced no output.\nCommand: {$cmd}"
-        );
-    }
-
-    return $output;
-}
-
-    /**
-     * @param bool $check  When true, throws if binary missing/not executable.
-     *                     When false, just returns the path for existence checks.
-     */
-    private function binaryPath(bool $check = true): string
-{
-    $root = dirname(__DIR__, 2);
-
-    // On Windows with WSL, use wsl to run the binary
-    if (PHP_OS_FAMILY === 'Windows') {
-        // Convert Windows path to WSL path with correct case
-        $wslPath = str_replace('\\', '/', $root);
-        $wslPath = preg_replace('/^([A-Za-z]):/', '/mnt/$1', $wslPath);
-        $wslPath = strtolower(substr($wslPath, 0, 5)) . substr($wslPath, 5);
-        $binary  = $wslPath . '/kaz-sign-c/kazsign-cli';
-    } else {
-        $binary = $root . '/kaz-sign-c/kazsign-cli';
-    }
-
-    if ($check && PHP_OS_FAMILY === 'Windows') {
-        // Check using WSL
-        $exists = shell_exec('wsl -d Ubuntu -u root test -f ' . escapeshellarg($binary) . ' && echo YES || echo NO');
-        if (trim($exists) !== 'YES') {
+        if ($output === null || trim($output) === '') {
             throw new \RuntimeException(
-                "kazsign-cli not found at WSL path: {$binary}\n" .
-                "Make sure it was compiled in WSL."
+                "kazsign-cli '{$sub}' produced no output.\nCommand: {$cmd}"
             );
         }
+
+        error_log('[KazSign] OUT: ' . substr(trim($output), 0, 100));
+
+        return $output;
     }
 
-    return $binary;
-}
+    // =========================================================================
+    //  Path helpers
+    // =========================================================================
+
+    /**
+     * Convert Windows project root to WSL Linux path.
+     *
+     * C:\xampp1\htdocs\KZ-Intergration
+     * becomes:
+     * /mnt/c/xampp1/htdocs/KZ-Intergration
+     *
+     * Only the drive letter is lowercased — folder names keep their
+     * original case because WSL/Linux is case-sensitive.
+     */
+    private function getWslBinaryPath(): string
+    {
+        // Use ROOT_PATH constant if defined (set in public/index.php)
+        // otherwise calculate from this file's location
+        $root = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+
+        // Replace Windows backslashes with forward slashes
+        $path = str_replace('\\', '/', $root);
+
+        // Convert drive letter: C:/path → /mnt/c/path
+        if (preg_match('/^([A-Za-z]):\/(.*)$/', $path, $m)) {
+            $path = '/mnt/' . strtolower($m[1]) . '/' . $m[2];
+        }
+
+        return $path . '/kaz-sign-c/' . self::BINARY_NAME;
+    }
+
+    /**
+     * Get direct Linux path (when running PHP on Linux, not Windows).
+     */
+    private function getLinuxBinaryPath(): string
+    {
+        $root = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        return $root . '/kaz-sign-c/' . self::BINARY_NAME;
+    }
 
     // =========================================================================
     //  Key helpers
