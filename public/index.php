@@ -30,6 +30,7 @@ session_start();
 
 $router = new KazSign\Core\Router();
 
+// Auth
 $router->get( '/login',       [\KazSign\Controllers\AuthController::class, 'loginForm']);
 $router->post('/login',       [\KazSign\Controllers\AuthController::class, 'login']);
 $router->get( '/register',    [\KazSign\Controllers\AuthController::class, 'registerForm']);
@@ -38,12 +39,16 @@ $router->get( '/logout',      [\KazSign\Controllers\AuthController::class, 'logo
 $router->get( '/key',         [\KazSign\Controllers\AuthController::class, 'saveKeyPage']);
 $router->post('/key/confirm', [\KazSign\Controllers\AuthController::class, 'saveKeyConfirm']);
 
+// Dashboard
 $router->get('/', [\KazSign\Controllers\DashboardController::class, 'index']);
 
-$router->post('/credentials/issue',      [\KazSign\Controllers\CredentialController::class, 'issue']);
-$router->post('/credentials/verify',     [\KazSign\Controllers\CredentialController::class, 'verify']);
-$router->get( '/credentials/:id/show',   [\KazSign\Controllers\CredentialController::class, 'show']);
+// Credentials
+$router->post('/credentials/issue',  [\KazSign\Controllers\CredentialController::class, 'issue']);
+$router->post('/credentials/revoke', [\KazSign\Controllers\CredentialController::class, 'revoke']);
+$router->post('/credentials/verify', [\KazSign\Controllers\CredentialController::class, 'verify']);
+$router->get( '/credentials/:id/show', [\KazSign\Controllers\CredentialController::class, 'show']);
 
+// Documents
 $router->get( '/documents',            [\KazSign\Controllers\DocumentController::class, 'index']);
 $router->get( '/documents/upload',     [\KazSign\Controllers\DocumentController::class, 'uploadForm']);
 $router->post('/documents/upload',     [\KazSign\Controllers\DocumentController::class, 'upload']);
