@@ -136,9 +136,6 @@ $credentialFields = [
                     <select name="credential_type" id="credential_type" onchange="switchFields(this.value)"
                             class="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none">
                         <option value="AcademicCredential">Academic Credential</option>
-                        <option value="EmploymentCredential">Employment Credential</option>
-                        <option value="IdentityCredential">Identity Credential</option>
-                        <option value="MedicalCredential">Medical Credential</option>
                     </select>
                 </div>
             </div>
