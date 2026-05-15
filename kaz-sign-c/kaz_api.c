@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <math.h>
 #include <openssl/evp.h>
 
@@ -37,7 +38,7 @@ void init_random() {
 		fclose(urandom);
 		seed ^= rnd; // Combine with random data from /dev/urandom
 	}
-	
+
     gmp_randinit_default(state);
     gmp_randseed_ui(state, seed);
 }
