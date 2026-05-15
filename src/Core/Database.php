@@ -67,54 +67,35 @@ final class Database
 
     private function connectSQLite(): void
     {
-        // Walk up from src/Core/ → src/ → project root
-        $root    = dirname(__DIR__, 2);
+        $root    = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $storage = $root . DIRECTORY_SEPARATOR . 'storage';
 
-        // Create storage folder if missing
         if (!is_dir($storage)) {
             if (!mkdir($storage, 0755, true)) {
-                throw new \RuntimeException(
-                    "Cannot create storage folder at: {$storage}\n" .
-                    "Please create it manually: mkdir storage"
-                );
+                throw new \RuntimeException("Cannot create storage folder: {$storage}");
             }
         }
 
         if (!is_writable($storage)) {
-            throw new \RuntimeException(
-                "Storage folder is not writable: {$storage}\n" .
-                "Please give write permission to this folder."
-            );
+            throw new \RuntimeException("Storage folder not writable: {$storage}");
         }
 
-        $dbFile    = $storage . DIRECTORY_SEPARATOR . 'kaz_sign.db';
-        $isNewFile = !file_exists($dbFile);
+        $dbFile = $storage . DIRECTORY_SEPARATOR . 'kaz_sign.db';
 
-        $this->connection = new PDO(
-            'sqlite:' . $dbFile,
-            null,
-            null,
-            self::PDO_OPTIONS
-        );
-
-        // Enable WAL mode and foreign keys
+        $this->connection = new PDO('sqlite:' . $dbFile, null, null, self::PDO_OPTIONS);
         $this->connection->exec('PRAGMA journal_mode=WAL');
         $this->connection->exec('PRAGMA foreign_keys=ON');
 
-        // Auto-create schema on first run
-        if ($isNewFile) {
-            $this->createSQLiteSchema();
-            error_log('[KazSign] SQLite database created at: ' . $dbFile);
-        } else {
-            // Always ensure all tables exist (safe to run on existing db)
-            $this->createSQLiteSchema();
-        }
+        // Always run schema — safe to call on existing DB
+        $this->createSQLiteSchema();
+
+        // Migrate old databases that have CHECK constraint without 'revoked'
+        $this->migrateSQLiteSchema();
     }
 
     private function createSQLiteSchema(): void
     {
-        // Users table
+        // Users
         $this->connection->exec("
             CREATE TABLE IF NOT EXISTS users (
                 id          INTEGER  PRIMARY KEY AUTOINCREMENT,
@@ -128,12 +109,10 @@ final class Database
                 updated_at  TEXT     NOT NULL DEFAULT (datetime('now'))
             )
         ");
-
-        // Unique indexes
         $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_username ON users(username)");
-        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email    ON users(email)");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email)");
 
-        // Issuers table
+        // Issuers
         $this->connection->exec("
             CREATE TABLE IF NOT EXISTS issuers (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,7 +124,7 @@ final class Database
         ");
         $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_issuers_user ON issuers(user_id)");
 
-        // Holders table
+        // Holders
         $this->connection->exec("
             CREATE TABLE IF NOT EXISTS holders (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,7 +137,7 @@ final class Database
         ");
         $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_holders_user ON holders(user_id)");
 
-        // Verifiers table
+        // Verifiers
         $this->connection->exec("
             CREATE TABLE IF NOT EXISTS verifiers (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,7 +149,7 @@ final class Database
         ");
         $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_verifiers_user ON verifiers(user_id)");
 
-        // Credentials table
+        // Credentials — NO CHECK constraint so any status works
         $this->connection->exec("
             CREATE TABLE IF NOT EXISTS credentials (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,7 +160,7 @@ final class Database
                 jsonld        TEXT    NOT NULL,
                 signature     TEXT    NOT NULL,
                 file_hash     TEXT    NOT NULL,
-                status        TEXT    NOT NULL DEFAULT 'issued'
+                status        TEXT    NOT NULL DEFAULT 'issued',
                 issued_at     TEXT    NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (issuer_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (holder_id) REFERENCES users(id) ON DELETE CASCADE
@@ -189,7 +168,7 @@ final class Database
         ");
         $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_credential_id ON credentials(credential_id)");
 
-        // Documents table
+        // Documents
         $this->connection->exec("
             CREATE TABLE IF NOT EXISTS documents (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -202,6 +181,70 @@ final class Database
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ");
+    }
+
+    /**
+     * Migrate old databases that have CHECK constraint on credentials.status
+     * that does not include 'revoked'.
+     *
+     * Detects the constraint by trying an UPDATE to 'revoked' on a non-existent
+     * row — if it throws a constraint error, we rebuild the table without the
+     * CHECK constraint.
+     */
+    private function migrateSQLiteSchema(): void
+    {
+        try {
+            // Check if credentials table has the old restrictive CHECK constraint
+            $schema = $this->connection->query(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='credentials'"
+            )->fetchColumn();
+
+            // If schema contains CHECK constraint that doesn't include 'revoked'
+            if ($schema &&
+                str_contains($schema, 'CHECK') &&
+                str_contains($schema, "'issued','verified','rejected'") &&
+                !str_contains($schema, "'revoked'")
+            ) {
+                error_log('[KazSign] Migrating credentials table to support revoked status...');
+                $this->rebuildCredentialsTable();
+                error_log('[KazSign] Migration complete.');
+            }
+        } catch (\Throwable $e) {
+            error_log('[KazSign] Migration check failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Rebuild credentials table without CHECK constraint.
+     * Preserves all existing data.
+     */
+    private function rebuildCredentialsTable(): void
+    {
+        $this->connection->exec('PRAGMA foreign_keys=OFF');
+
+        $this->connection->exec("
+            CREATE TABLE credentials_new (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer_id     INTEGER NOT NULL,
+                holder_id     INTEGER NOT NULL,
+                credential_id TEXT    NOT NULL,
+                subject       TEXT    NOT NULL,
+                jsonld        TEXT    NOT NULL,
+                signature     TEXT    NOT NULL,
+                file_hash     TEXT    NOT NULL,
+                status        TEXT    NOT NULL DEFAULT 'issued',
+                issued_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (issuer_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (holder_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ");
+
+        $this->connection->exec("INSERT INTO credentials_new SELECT * FROM credentials");
+        $this->connection->exec("DROP TABLE credentials");
+        $this->connection->exec("ALTER TABLE credentials_new RENAME TO credentials");
+        $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_credential_id ON credentials(credential_id)");
+
+        $this->connection->exec('PRAGMA foreign_keys=ON');
     }
 
     // =========================================================================
@@ -217,8 +260,7 @@ final class Database
         $pass    = getenv('DB_PASS')    ?: '';
         $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
 
-        $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
-
+        $dsn     = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
         $options = self::PDO_OPTIONS + [
             PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES 'utf8mb4'",
         ];
