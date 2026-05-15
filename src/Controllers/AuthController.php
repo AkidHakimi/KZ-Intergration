@@ -74,7 +74,7 @@ final class AuthController extends Controller
             $this->redirect('/register');
         }
 
-        // Check if username already exists — give helpful message
+        // Check if username already exists
         try {
             $check = Database::getInstance()->prepare(
                 'SELECT id, role FROM users WHERE username = :u OR email = :e LIMIT 1'
@@ -93,32 +93,18 @@ final class AuthController extends Controller
             // Continue if check fails
         }
 
-                // If registering as issuer, add to trust registry
-            if ($role === 'issuer') {
-                    $stmt = $db->prepare(
-                        'INSERT INTO trust_registry (did, issuer_name, public_key, user_id, status)
-                        VALUES (:did, :name, :pk, :uid, :status)'
-                    );
-                    $stmt->execute([
-                        ':did'    => $did,
-                        ':name'   => $organisation,
-                        ':pk'     => $keyPair['public_key'],
-                        ':uid'    => $userId,
-                        ':status' => 'active',
-                ]);
-            }   
-
-        // Generate KAZ-SIGN PQC key pair
+        // ── STEP 1: Generate KAZ-SIGN PQC key pair ───────────────────────────
         $engine  = new KazSignEngine();
         $keyPair = $engine->generateKeyPair();
 
-        // Generate DID
+        // ── STEP 2: Generate DID ──────────────────────────────────────────────
         $did = 'did:kazsign:' . hash('sha256', $username);
 
+        // ── STEP 3: Get DB instance ───────────────────────────────────────────
         $db = Database::getInstance();
 
         try {
-            // Try with did column
+            // ── STEP 4: Insert into users table ──────────────────────────────
             try {
                 $stmt = $db->prepare(
                     'INSERT INTO users (username, email, role, password, public_key, did)
@@ -150,18 +136,43 @@ final class AuthController extends Controller
                 }
             }
 
+            // ── STEP 5: Get the new user ID ───────────────────────────────────
             $userId = $db->lastInsertId();
 
-            // Insert into role table
+            // ── STEP 6: Insert into role-specific table ───────────────────────
             if ($role === 'issuer') {
-                $stmt = $db->prepare('INSERT INTO issuers (user_id, organisation) VALUES (:uid, :org)');
+                $stmt = $db->prepare(
+                    'INSERT INTO issuers (user_id, organisation) VALUES (:uid, :org)'
+                );
                 $stmt->execute([':uid' => $userId, ':org' => $organisation]);
+
             } elseif ($role === 'holder') {
-                $stmt = $db->prepare('INSERT INTO holders (user_id, full_name, id_number) VALUES (:uid, :name, :idn)');
+                $stmt = $db->prepare(
+                    'INSERT INTO holders (user_id, full_name, id_number) VALUES (:uid, :name, :idn)'
+                );
                 $stmt->execute([':uid' => $userId, ':name' => $fullName, ':idn' => $idNumber]);
+
             } elseif ($role === 'verifier') {
-                $stmt = $db->prepare('INSERT INTO verifiers (user_id, organisation) VALUES (:uid, :org)');
+                $stmt = $db->prepare(
+                    'INSERT INTO verifiers (user_id, organisation) VALUES (:uid, :org)'
+                );
                 $stmt->execute([':uid' => $userId, ':org' => $organisation]);
+            }
+
+            // ── STEP 7: Register issuer public key into trust registry ─────────
+            // Must be AFTER $userId, $did, $keyPair, and $db are all defined.
+            if ($role === 'issuer') {
+                $stmt = $db->prepare(
+                    'INSERT INTO trust_registry (did, issuer_name, public_key, user_id, status)
+                     VALUES (:did, :name, :pk, :uid, :status)'
+                );
+                $stmt->execute([
+                    ':did'    => $did,
+                    ':name'   => $organisation,
+                    ':pk'     => $keyPair['public_key'],
+                    ':uid'    => $userId,
+                    ':status' => 'active',
+                ]);
             }
 
         } catch (\Throwable $e) {
@@ -251,7 +262,6 @@ final class AuthController extends Controller
             $stmt->execute([':u' => $username]);
             $user = $stmt->fetch();
         } catch (\Throwable $e) {
-            // Try without did column for older schema
             try {
                 $stmt = Database::getInstance()->prepare(
                     'SELECT id, username, password, role FROM users WHERE username = :u LIMIT 1'
@@ -264,7 +274,6 @@ final class AuthController extends Controller
             }
         }
 
-        // Username not found
         if ($user === false) {
             $this->setFlash('error',
                 "No account found with username <strong>{$username}</strong>. " .
@@ -273,15 +282,11 @@ final class AuthController extends Controller
             $this->redirect('/login');
         }
 
-        // Wrong password
         if (!password_verify($password, $user['password'])) {
-            $this->setFlash('error',
-                'Incorrect password. Please try again.'
-            );
+            $this->setFlash('error', 'Incorrect password. Please try again.');
             $this->redirect('/login');
         }
 
-        // Private key format check
         if ($privateKey !== '' && !str_starts_with($privateKey, 'KAZSIGN-PRV-v1::')) {
             $this->setFlash('error',
                 'Invalid private key format. It must start with <code>KAZSIGN-PRV-v1::</code>. ' .
@@ -290,7 +295,6 @@ final class AuthController extends Controller
             $this->redirect('/login');
         }
 
-        // All good — start session
         session_regenerate_id(delete_old_session: true);
         $_SESSION['user_id']     = (int) $user['id'];
         $_SESSION['username']    = $user['username'];
