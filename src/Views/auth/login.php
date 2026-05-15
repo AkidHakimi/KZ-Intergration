@@ -25,8 +25,7 @@
             <?= $flash['type'] === 'success'
                 ? 'border-emerald-700 bg-emerald-900/30 text-emerald-300'
                 : 'border-red-800 bg-red-950/50 text-red-300' ?>">
-            <?= htmlspecialchars($flash['message'], ENT_QUOTES, 'UTF-8') ?>
-        </div>
+                <?= $flash['message'] ?>        </div>
     <?php endif; ?>
 
     <!-- Login Form -->

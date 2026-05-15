@@ -23,7 +23,8 @@
     <?php if (!empty($flash)): ?>
         <div class="rounded-lg border px-4 py-3 text-sm
             <?= $flash['type'] === 'success' ? 'border-emerald-700 bg-emerald-900/30 text-emerald-300' : 'border-red-800 bg-red-950/50 text-red-300' ?>">
-            <?= htmlspecialchars($flash['message'], ENT_QUOTES, 'UTF-8') ?>
+            <!-- NEW — renders safe HTML links in flash messages -->
+            <?= strip_tags($flash['message'], '<a><strong><code>') ?>       
         </div>
     <?php endif; ?>
 

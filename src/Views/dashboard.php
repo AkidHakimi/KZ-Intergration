@@ -33,32 +33,7 @@ $credentialFields = [
         ['key' => 'senateDate',        'label' => 'Senate Date',          'type' => 'text',     'placeholder' => 'e.g. AUGUST 28, 2024'],
         ['key' => 'convocationYear',   'label' => 'Convocation Year',     'type' => 'text',     'placeholder' => 'e.g. 2024'],
     ],
-    'EmploymentCredential' => [
-        ['key' => 'name',           'label' => 'Full Name',       'type' => 'text', 'placeholder' => 'e.g. Ahmad Ali'],
-        ['key' => 'position',       'label' => 'Position',        'type' => 'text', 'placeholder' => 'e.g. Software Engineer'],
-        ['key' => 'department',     'label' => 'Department',      'type' => 'text', 'placeholder' => 'e.g. Information Technology'],
-        ['key' => 'organisation',   'label' => 'Organisation',    'type' => 'text', 'placeholder' => 'e.g. Petronas Berhad'],
-        ['key' => 'employeeId',     'label' => 'Employee ID',     'type' => 'text', 'placeholder' => 'e.g. EMP-2024-001'],
-        ['key' => 'startDate',      'label' => 'Start Date',      'type' => 'text', 'placeholder' => 'e.g. JANUARY 1, 2020'],
-        ['key' => 'employmentType', 'label' => 'Employment Type', 'type' => 'text', 'placeholder' => 'e.g. Permanent'],
-    ],
-    'IdentityCredential' => [
-        ['key' => 'name',        'label' => 'Full Name',      'type' => 'text',     'placeholder' => 'e.g. Ahmad Ali'],
-        ['key' => 'idNumber',    'label' => 'IC / ID Number', 'type' => 'text',     'placeholder' => 'e.g. 991234-01-5678'],
-        ['key' => 'dateOfBirth', 'label' => 'Date of Birth',  'type' => 'text',     'placeholder' => 'e.g. DECEMBER 34, 1999'],
-        ['key' => 'nationality', 'label' => 'Nationality',    'type' => 'text',     'placeholder' => 'e.g. Malaysian'],
-        ['key' => 'gender',      'label' => 'Gender',         'type' => 'text',     'placeholder' => 'Male / Female'],
-        ['key' => 'address',     'label' => 'Address',        'type' => 'textarea', 'placeholder' => 'Full address'],
-    ],
-    'MedicalCredential' => [
-        ['key' => 'name',       'label' => 'Patient Name', 'type' => 'text',     'placeholder' => 'e.g. Ahmad Ali'],
-        ['key' => 'patientId',  'label' => 'Patient ID',   'type' => 'text',     'placeholder' => 'e.g. PAT-2024-001'],
-        ['key' => 'diagnosis',  'label' => 'Diagnosis',    'type' => 'text',     'placeholder' => 'e.g. Hypertension'],
-        ['key' => 'treatment',  'label' => 'Treatment',    'type' => 'textarea', 'placeholder' => 'e.g. Prescribed medication...'],
-        ['key' => 'doctorName', 'label' => 'Doctor Name',  'type' => 'text',     'placeholder' => 'e.g. Dr. Siti Aminah'],
-        ['key' => 'hospital',   'label' => 'Hospital',     'type' => 'text',     'placeholder' => 'e.g. Hospital KL'],
-        ['key' => 'visitDate',  'label' => 'Visit Date',   'type' => 'text',     'placeholder' => 'e.g. MAY 13, 2025'],
-    ],
+  
 ];
 ?>
 
@@ -97,7 +72,7 @@ $credentialFields = [
     <?php if (!empty($flash)): ?>
         <div class="rounded-lg border px-4 py-3 text-sm
             <?= $flash['type'] === 'success' ? 'border-emerald-700 bg-emerald-900/30 text-emerald-300' : 'border-red-800 bg-red-950/50 text-red-300' ?>">
-            <?= htmlspecialchars($flash['message'], ENT_QUOTES, 'UTF-8') ?>
+            <?= $flash['message'] ?>
         </div>
     <?php endif; ?>
 
