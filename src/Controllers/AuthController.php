@@ -9,10 +9,14 @@ use KazSign\Core\Database;
 use KazSign\Core\KazSignEngine;
 
 /**
- * AuthController — registration (with role + DID), login, logout, key handoff.
+ * AuthController — registration, login, logout, key handoff.
  */
 final class AuthController extends Controller
 {
+    // -------------------------------------------------------------------------
+    // Registration
+    // -------------------------------------------------------------------------
+
     /** GET /register */
     public function registerForm(array $_params = []): void
     {
@@ -70,6 +74,25 @@ final class AuthController extends Controller
             $this->redirect('/register');
         }
 
+        // Check if username already exists — give helpful message
+        try {
+            $check = Database::getInstance()->prepare(
+                'SELECT id, role FROM users WHERE username = :u OR email = :e LIMIT 1'
+            );
+            $check->execute([':u' => $username, ':e' => $email]);
+            $existing = $check->fetch();
+
+            if ($existing) {
+                $this->setFlash('error',
+                    "This account already exists. " .
+                    "<a href='/KZ-Intergration/public/login' style='color:#34d399;text-decoration:underline'>Sign in instead →</a>"
+                );
+                $this->redirect('/register');
+            }
+        } catch (\Throwable $e) {
+            // Continue if check fails
+        }
+
         // Generate KAZ-SIGN PQC key pair
         $engine  = new KazSignEngine();
         $keyPair = $engine->generateKeyPair();
@@ -80,7 +103,7 @@ final class AuthController extends Controller
         $db = Database::getInstance();
 
         try {
-            // Insert user — try with did column first
+            // Try with did column
             try {
                 $stmt = $db->prepare(
                     'INSERT INTO users (username, email, role, password, public_key, did)
@@ -95,7 +118,6 @@ final class AuthController extends Controller
                     ':did'        => $did,
                 ]);
             } catch (\Throwable $e) {
-                // If did column doesn't exist, try without it
                 if (str_contains($e->getMessage(), 'did') || str_contains($e->getMessage(), 'no such column')) {
                     $stmt = $db->prepare(
                         'INSERT INTO users (username, email, role, password, public_key)
@@ -117,35 +139,26 @@ final class AuthController extends Controller
 
             // Insert into role table
             if ($role === 'issuer') {
-                $stmt = $db->prepare(
-                    'INSERT INTO issuers (user_id, organisation) VALUES (:uid, :org)'
-                );
+                $stmt = $db->prepare('INSERT INTO issuers (user_id, organisation) VALUES (:uid, :org)');
                 $stmt->execute([':uid' => $userId, ':org' => $organisation]);
-
             } elseif ($role === 'holder') {
-                $stmt = $db->prepare(
-                    'INSERT INTO holders (user_id, full_name, id_number)
-                     VALUES (:uid, :name, :idn)'
-                );
+                $stmt = $db->prepare('INSERT INTO holders (user_id, full_name, id_number) VALUES (:uid, :name, :idn)');
                 $stmt->execute([':uid' => $userId, ':name' => $fullName, ':idn' => $idNumber]);
-
             } elseif ($role === 'verifier') {
-                $stmt = $db->prepare(
-                    'INSERT INTO verifiers (user_id, organisation) VALUES (:uid, :org)'
-                );
+                $stmt = $db->prepare('INSERT INTO verifiers (user_id, organisation) VALUES (:uid, :org)');
                 $stmt->execute([':uid' => $userId, ':org' => $organisation]);
             }
 
         } catch (\Throwable $e) {
             $msg = $e->getMessage();
-
             if (str_contains($msg, '1062') || str_contains($msg, 'UNIQUE constraint failed')) {
-                $this->setFlash('error', 'Username or email is already taken.');
+                $this->setFlash('error',
+                    "Username or email is already taken. " .
+                    "Already have an account? <a href='/KZ-Intergration/public/login' style='color:#34d399;text-decoration:underline'>Sign in here →</a>"
+                );
             } else {
-                // Show the REAL error so we can debug it
                 $this->setFlash('error', 'Registration failed: ' . $msg);
             }
-
             error_log('[KazSign] Register error: ' . $msg);
             $this->redirect('/register');
         }
@@ -160,14 +173,18 @@ final class AuthController extends Controller
         $this->redirect('/key');
     }
 
+    // -------------------------------------------------------------------------
+    // Key save page
+    // -------------------------------------------------------------------------
+
     /** GET /key */
     public function saveKeyPage(array $_params = []): void
     {
         $this->requireAuth();
         $this->render('auth.save_key', [
             'private_key' => $_SESSION['private_key'] ?? '',
-            'did'         => $_SESSION['did']         ?? '',
-            'role'        => $_SESSION['role']         ?? 'holder',
+            'did'         => $_SESSION['did']          ?? '',
+            'role'        => $_SESSION['role']          ?? 'holder',
             'csrf_token'  => $this->generateCsrfToken(),
         ]);
     }
@@ -180,6 +197,10 @@ final class AuthController extends Controller
         $this->setFlash('success', 'Welcome! Your KAZ-SIGN PQC key pair is active.');
         $this->redirect('/');
     }
+
+    // -------------------------------------------------------------------------
+    // Login
+    // -------------------------------------------------------------------------
 
     /** GET /login */
     public function loginForm(array $_params = []): void
@@ -207,6 +228,7 @@ final class AuthController extends Controller
             $this->redirect('/login');
         }
 
+        // Find user
         try {
             $stmt = Database::getInstance()->prepare(
                 'SELECT id, username, password, role, did FROM users WHERE username = :u LIMIT 1'
@@ -227,16 +249,33 @@ final class AuthController extends Controller
             }
         }
 
-        if ($user === false || !password_verify($password, $user['password'])) {
-            $this->setFlash('error', 'Invalid username or password.');
+        // Username not found
+        if ($user === false) {
+            $this->setFlash('error',
+                "No account found with username <strong>{$username}</strong>. " .
+                "Did you <a href='/KZ-Intergration/public/register' style='color:#34d399;text-decoration:underline'>register yet?</a>"
+            );
             $this->redirect('/login');
         }
 
+        // Wrong password
+        if (!password_verify($password, $user['password'])) {
+            $this->setFlash('error',
+                'Incorrect password. Please try again.'
+            );
+            $this->redirect('/login');
+        }
+
+        // Private key format check
         if ($privateKey !== '' && !str_starts_with($privateKey, 'KAZSIGN-PRV-v1::')) {
-            $this->setFlash('error', 'Invalid private key format.');
+            $this->setFlash('error',
+                'Invalid private key format. It must start with <code>KAZSIGN-PRV-v1::</code>. ' .
+                'Check you copied it correctly, or leave it blank to login without signing ability.'
+            );
             $this->redirect('/login');
         }
 
+        // All good — start session
         session_regenerate_id(delete_old_session: true);
         $_SESSION['user_id']     = (int) $user['id'];
         $_SESSION['username']    = $user['username'];
@@ -244,9 +283,27 @@ final class AuthController extends Controller
         $_SESSION['did']         = $user['did']  ?? ('did:kazsign:' . hash('sha256', $user['username']));
         $_SESSION['private_key'] = $privateKey !== '' ? $privateKey : null;
 
-        $this->setFlash('success', "Welcome back, {$user['username']}! Signed in as {$_SESSION['role']}.");
+        $role = $_SESSION['role'];
+
+        if ($privateKey !== '') {
+            $this->setFlash('success', "Welcome back, {$user['username']}! Signed in as {$role} with PQC signing enabled.");
+        } else {
+            if ($role === 'issuer') {
+                $this->setFlash('warning',
+                    "Logged in as issuer but no private key provided. " .
+                    "You cannot sign credentials. <a href='/KZ-Intergration/public/logout' style='color:#fbbf24;text-decoration:underline'>Re-login with your key →</a>"
+                );
+            } else {
+                $this->setFlash('success', "Welcome back, {$user['username']}! Signed in as {$role}.");
+            }
+        }
+
         $this->redirect('/');
     }
+
+    // -------------------------------------------------------------------------
+    // Logout
+    // -------------------------------------------------------------------------
 
     /** GET /logout */
     public function logout(array $_params = []): void
