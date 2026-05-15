@@ -23,7 +23,21 @@ void init_random() {
 
     //gmp_randinit_default(state);
     //gmp_randseed_ui(state, seed);
-	unsigned long seed = 123456789UL;   // fixed seed for repeatability
+	//unsigned long seed = 123456789UL;   // fixed seed for repeatability
+	unsigned long seed = 0;
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	seed ^= (unsigned long) ts.tv_nsec;
+	seed ^= (unsigned long) ts.tv_sec * 1000000000UL; // Shift seconds to avoid overlap with nanoseconds
+	seed ^= (unsigned long) getpid() * 6364136223846793005UL; // Add process ID for more variability 
+	FILE *urandom = fopen("/dev/urandom", "rb");
+	if (urandom) {
+		unsigned long rnd =0;
+		fread(&rnd, sizeof(rnd), 1, urandom);
+		fclose(urandom);
+		seed ^= rnd; // Combine with random data from /dev/urandom
+	}
+	
     gmp_randinit_default(state);
     gmp_randseed_ui(state, seed);
 }
