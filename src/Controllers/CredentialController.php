@@ -191,12 +191,46 @@ final class CredentialController extends Controller
             $this->flashAndRedirect('error', 'Please enter a Credential ID.', '/');
         }
 
-        $stmt = Database::getInstance()->prepare(
-            'SELECT c.*, u.public_key AS issuer_public_key
-               FROM credentials c
-               JOIN users u ON u.id = c.issuer_id
-              WHERE c.credential_id = :cid LIMIT 1'
-        );
+        // NEW — fetches credential first, then resolves public key from trust registry
+$stmt = Database::getInstance()->prepare(
+    'SELECT c.*, u.did AS issuer_did
+       FROM credentials c
+       JOIN users u ON u.id = c.issuer_id
+      WHERE c.credential_id = :cid LIMIT 1'
+);
+$stmt->execute([':cid' => $credentialId]);
+$cred = $stmt->fetch();
+
+if (!$cred) { /* handle not found */ }
+
+// Resolve issuer public key from trust registry using their DID
+$regStmt = Database::getInstance()->prepare(
+    'SELECT public_key, status FROM trust_registry
+      WHERE did = :did LIMIT 1'
+);
+$regStmt->execute([':did' => $cred['issuer_did']]);
+$registryEntry = $regStmt->fetch();
+
+if (!$registryEntry) {
+    // Issuer DID not found in trust registry — reject
+    $this->renderVerifierDashboard([
+        'type'    => 'error',
+        'message' => '✗ Issuer is not in the trust registry. This credential cannot be verified.'
+    ], null);
+    return;
+}
+
+if ($registryEntry['status'] !== 'active') {
+    // Issuer has been deregistered or suspended
+    $this->renderVerifierDashboard([
+        'type'    => 'error',
+        'message' => '✗ The issuer of this credential is no longer a trusted issuer.'
+    ], null);
+    return;
+}
+
+// Use the public key from the registry (not from users table)
+$cred['issuer_public_key'] = $registryEntry['public_key'];
         $stmt->execute([':cid' => $credentialId]);
         $cred = $stmt->fetch();
 

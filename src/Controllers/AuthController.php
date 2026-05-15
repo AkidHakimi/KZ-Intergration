@@ -93,6 +93,21 @@ final class AuthController extends Controller
             // Continue if check fails
         }
 
+                // If registering as issuer, add to trust registry
+            if ($role === 'issuer') {
+                    $stmt = $db->prepare(
+                        'INSERT INTO trust_registry (did, issuer_name, public_key, user_id, status)
+                        VALUES (:did, :name, :pk, :uid, :status)'
+                    );
+                    $stmt->execute([
+                        ':did'    => $did,
+                        ':name'   => $organisation,
+                        ':pk'     => $keyPair['public_key'],
+                        ':uid'    => $userId,
+                        ':status' => 'active',
+                ]);
+            }   
+
         // Generate KAZ-SIGN PQC key pair
         $engine  = new KazSignEngine();
         $keyPair = $engine->generateKeyPair();

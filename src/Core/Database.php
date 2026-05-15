@@ -181,6 +181,22 @@ final class Database
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         ");
+
+        $this->connection->exec("
+            CREATE TABLE IF NOT EXISTS trust_registry (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                did          TEXT    NOT NULL,
+                issuer_name  TEXT    NOT NULL,
+                public_key   TEXT    NOT NULL,
+                user_id      INTEGER NOT NULL,
+                status       TEXT    NOT NULL DEFAULT 'active',
+                registered_at TEXT   NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+             )
+"       );
+        $this->connection->exec(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_registry_did ON trust_registry(did)"
+        );
     }
 
     /**

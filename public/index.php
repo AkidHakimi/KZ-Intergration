@@ -54,4 +54,8 @@ $router->get( '/documents/upload',     [\KazSign\Controllers\DocumentController:
 $router->post('/documents/upload',     [\KazSign\Controllers\DocumentController::class, 'upload']);
 $router->get( '/documents/:id/verify', [\KazSign\Controllers\DocumentController::class, 'verify']);
 
+// Trust Registry
+$router->get('/trust-registry',        [\KazSign\Controllers\TrustRegistryController::class, 'index']);
+$router->get('/trust-registry/:did',   [\KazSign\Controllers\TrustRegistryController::class, 'resolve']);
+
 $router->dispatch();
