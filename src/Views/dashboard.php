@@ -30,7 +30,7 @@ $credentialFields = [
         ['key' => 'awardNameEnglish',  'label' => 'Award Name (English)', 'type' => 'text',     'placeholder' => 'e.g. BACHELOR OF EDUCATION WITH HONOURS'],
         ['key' => 'awardNameMalay',    'label' => 'Award Name (Malay)',   'type' => 'textarea', 'placeholder' => 'e.g. SARJANA MUDA PENDIDIKAN DENGAN KEPUJIAN'],
         ['key' => 'certificateSerial', 'label' => 'Certificate Serial No','type' => 'text',     'placeholder' => 'e.g. 88720802'],
-        ['key' => 'senateDate',        'label' => 'Senate Date',          'type' => 'text',     'placeholder' => 'e.g. AUGUST 28, 2024'],
+        ['key' => 'senateDate',        'label' => 'Senate Date',          'type' => 'text',     'placeholder' => 'e.g. 28 AUGUST 2024'],
         ['key' => 'convocationYear',   'label' => 'Convocation Year',     'type' => 'text',     'placeholder' => 'e.g. 2024'],
     ],
   
@@ -236,7 +236,7 @@ $credentialFields = [
                                     'subject'     => $subject,
                                     'status'      => $s,
                                 ]), ENT_QUOTES, 'UTF-8') ?>)'
-                                        class="block text-[10px] text-blue-400 hover:underline">📄 Download PDF + QR</button>
+                                        class="block text-[10px] text-blue-400 hover:underline">Download PDF</button>
 
                                 <!-- Revoke -->
                                 <?php if ($s !== 'revoked'): ?>
@@ -244,7 +244,7 @@ $credentialFields = [
                                       onsubmit="return confirm('Revoke this credential? This cannot be undone.')">
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
                                     <input type="hidden" name="credential_db_id" value="<?= (int)$c['id'] ?>" />
-                                    <button type="submit" class="block text-[10px] text-red-400 hover:underline">🚫 Revoke</button>
+                                    <button type="submit" class="block text-[10px] text-red-400 hover:underline">Revoke</button>
                                 </form>
                                 <?php else: ?>
                                     <span class="block text-[10px] text-orange-600">Revoked</span>
@@ -318,7 +318,7 @@ $credentialFields = [
                               : ($s === 'rejected'  ? 'border-red-800 bg-red-950/40 text-red-400'
                               : ($s === 'revoked'   ? 'border-orange-700 bg-orange-900/30 text-orange-400'
                               : 'border-blue-700 bg-blue-900/30 text-blue-400')) ?>">
-                            <?= $s === 'revoked' ? '🚫 Revoked' : ucfirst($s) ?>
+                            <?= $s === 'revoked' ? 'Revoked' : ucfirst($s) ?>
                         </span>
                     </div>
 
@@ -455,12 +455,12 @@ $credentialFields = [
 
         <?php if ($revoked): ?>
         <div class="rounded-lg border border-orange-700 bg-orange-900/20 px-4 py-3 text-sm font-semibold text-orange-300">
-            🚫 REVOKED — This credential was cancelled by the issuer and is no longer valid.
+            REVOKED — This credential was cancelled by the issuer and is no longer valid.
         </div>
         <?php endif; ?>
 
         <h2 class="text-sm font-semibold <?= $revoked ? 'text-orange-300' : (($result['verified'] ?? false) ? 'text-emerald-300' : 'text-red-300') ?>">
-            <?= $revoked ? '🚫 Credential Revoked' : (($result['verified'] ?? false) ? '✓ Credential Verified' : '✗ Verification Failed') ?>
+            <?= $revoked ? 'Credential Revoked' : (($result['verified'] ?? false) ? '✓ Credential Verified' : '✗ Verification Failed') ?>
         </h2>
 
         <?php if (!$revoked): ?>
