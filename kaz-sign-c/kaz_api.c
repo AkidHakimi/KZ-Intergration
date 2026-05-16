@@ -179,12 +179,7 @@ void KAZ_DS_KEYGEN(unsigned char *kaz_ds_verify_key, unsigned char *kaz_ds_sign_
 		}
 }
 
-int KAZ_DS_SIGNATURE(unsigned char *sign, 
-	                 unsigned long long *signlen, 
-					 const unsigned char *m, 
-					 unsigned long long mlen, 
-					 const unsigned char *sk)
-{
+int KAZ_DS_SIGNATURE(unsigned char *sign, unsigned long long *signlen, const unsigned char *m, unsigned long long mlen, const unsigned char *sk){
     mpz_t g1, g2, N, phiN, Og1N, Og2N, s, t;
     mpz_t tmp, lowerbound, upperbound, e1, e2, h, S1, S2, S3;
 

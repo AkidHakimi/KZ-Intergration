@@ -245,7 +245,7 @@ $cred['issuer_public_key'] = $registryEntry['public_key'];
         // ── REVOKED check — stop here, no signature check needed ──────────────
         if ($cred['status'] === 'revoked') {
             $this->renderVerifierDashboard(
-                ['type' => 'error', 'message' => '🚫 This credential has been REVOKED by the issuer and is no longer valid.'],
+                ['type' => 'error', 'message' => 'This credential has been REVOKED by the issuer and is no longer valid.'],
                 [
                     'credential'      => $cred,
                     'jsonld'          => json_decode($cred['jsonld'], true),
