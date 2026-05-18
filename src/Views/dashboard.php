@@ -431,7 +431,7 @@ $credentialFields = [
                         class="w-full rounded-lg bg-purple-600 px-5 py-2 text-xs font-bold uppercase tracking-widest
                                text-white hover:bg-purple-500 active:scale-95 transition-all
                                disabled:opacity-40 disabled:cursor-not-allowed">
-                    🔍 Verify PDF
+                    Verify PDF
                 </button>
             </div>
             <!-- Hidden form for PDF verify -->
