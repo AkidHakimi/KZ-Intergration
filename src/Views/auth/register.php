@@ -42,7 +42,7 @@
                        id="label-issuer">
                     <input type="radio" name="role" value="issuer" class="sr-only"
                            onchange="switchRole('issuer')" />
-                    <span class="block text-lg mb-1">🏛</span>
+                    <span class="block text-lg mb-1"></span>
                     <span class="block text-[10px] font-semibold text-slate-300">Issuer</span>
                 </label>
                 <label class="cursor-pointer rounded-lg border border-emerald-500 bg-emerald-900/20 p-3 text-center
@@ -50,7 +50,7 @@
                        id="label-holder">
                     <input type="radio" name="role" value="holder" class="sr-only"
                            onchange="switchRole('holder')" checked />
-                    <span class="block text-lg mb-1">👤</span>
+                    <span class="block text-lg mb-1"></span>
                     <span class="block text-[10px] font-semibold text-slate-300">Holder</span>
                 </label>
                 <label class="cursor-pointer rounded-lg border border-slate-700 bg-slate-800 p-3 text-center
@@ -58,7 +58,7 @@
                        id="label-verifier">
                     <input type="radio" name="role" value="verifier" class="sr-only"
                            onchange="switchRole('verifier')" />
-                    <span class="block text-lg mb-1">🔍</span>
+                    <span class="block text-lg mb-1"></span>
                     <span class="block text-[10px] font-semibold text-slate-300">Verifier</span>
                 </label>
             </div>

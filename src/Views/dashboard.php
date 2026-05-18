@@ -22,7 +22,7 @@ $roleColor = match($role) {
     'verifier' => 'border-purple-700 bg-purple-900/30 text-purple-300',
     default    => 'border-emerald-700 bg-emerald-900/30 text-emerald-300',
 };
-$roleIcon = match($role) { 'issuer' => '🏛', 'verifier' => '🔍', default => '👤' };
+$roleIcon = match($role) { 'issuer' => '', 'verifier' => '', default => '' };
 
 $credentialFields = [
     'AcademicCredential' => [
@@ -88,7 +88,7 @@ $credentialFields = [
     <!-- DID + PQC Identity Card -->
     <div class="rounded-xl border border-blue-800 bg-blue-900/10 p-5 space-y-3">
         <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold text-blue-300 uppercase tracking-widest">🔑 Issuer Identity</h2>
+            <h2 class="text-xs font-semibold text-blue-300 uppercase tracking-widest">Issuer Identity</h2>
             <div class="flex gap-2">
                 <span class="rounded-full border border-purple-700 bg-purple-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-purple-300">PQC</span>
                 <span class="rounded-full border border-blue-700 bg-blue-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-blue-300">KAZ-SIGN v1</span>
@@ -355,7 +355,7 @@ $credentialFields = [
                                 'subject'    => $subject,
                                 'status'     => $s,
                             ]), ENT_QUOTES, 'UTF-8') ?>)'
-                                    class="text-[10px] text-blue-400 hover:underline">📄 Download PDF</button>
+                                    class="text-[10px] text-blue-400 hover:underline">Download PDF</button>
                         </div>
                     </div>
 
