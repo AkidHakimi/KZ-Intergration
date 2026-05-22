@@ -191,46 +191,13 @@ final class CredentialController extends Controller
             $this->flashAndRedirect('error', 'Please enter a Credential ID.', '/');
         }
 
-        // NEW — fetches credential first, then resolves public key from trust registry
-$stmt = Database::getInstance()->prepare(
-    'SELECT c.*, u.did AS issuer_did
-       FROM credentials c
-       JOIN users u ON u.id = c.issuer_id
-      WHERE c.credential_id = :cid LIMIT 1'
-);
-$stmt->execute([':cid' => $credentialId]);
-$cred = $stmt->fetch();
-
-if (!$cred) { /* handle not found */ }
-
-// Resolve issuer public key from trust registry using their DID
-$regStmt = Database::getInstance()->prepare(
-    'SELECT public_key, status FROM trust_registry
-      WHERE did = :did LIMIT 1'
-);
-$regStmt->execute([':did' => $cred['issuer_did']]);
-$registryEntry = $regStmt->fetch();
-
-if (!$registryEntry) {
-    // Issuer DID not found in trust registry — reject
-    $this->renderVerifierDashboard([
-        'type'    => 'error',
-        'message' => '✗ Issuer is not in the trust registry. This credential cannot be verified.'
-    ], null);
-    return;
-}
-
-if ($registryEntry['status'] !== 'active') {
-    // Issuer has been deregistered or suspended
-    $this->renderVerifierDashboard([
-        'type'    => 'error',
-        'message' => '✗ The issuer of this credential is no longer a trusted issuer.'
-    ], null);
-    return;
-}
-
-// Use the public key from the registry (not from users table)
-$cred['issuer_public_key'] = $registryEntry['public_key'];
+        // ── STEP 1: Fetch credential + issuer DID in one query ────────────────
+        $stmt = Database::getInstance()->prepare(
+            'SELECT c.*, u.did AS issuer_did
+               FROM credentials c
+               JOIN users u ON u.id = c.issuer_id
+              WHERE c.credential_id = :cid LIMIT 1'
+        );
         $stmt->execute([':cid' => $credentialId]);
         $cred = $stmt->fetch();
 
@@ -242,7 +209,43 @@ $cred['issuer_public_key'] = $registryEntry['public_key'];
             return;
         }
 
-        // ── REVOKED check — stop here, no signature check needed ──────────────
+        // ── STEP 2: Resolve issuer public key from trust registry ─────────────
+        $regStmt = Database::getInstance()->prepare(
+            'SELECT public_key, status FROM trust_registry
+              WHERE did = :did LIMIT 1'
+        );
+        $regStmt->execute([':did' => $cred['issuer_did']]);
+        $registryEntry = $regStmt->fetch();
+
+        if (!$registryEntry) {
+            // Fallback: try to get public key directly from users table
+            $fallbackStmt = Database::getInstance()->prepare(
+                'SELECT public_key FROM users WHERE id = :id LIMIT 1'
+            );
+            $fallbackStmt->execute([':id' => $cred['issuer_id']]);
+            $fallbackUser = $fallbackStmt->fetch();
+
+            if (!$fallbackUser || empty($fallbackUser['public_key'])) {
+                $this->renderVerifierDashboard(
+                    ['type' => 'error', 'message' => '✗ Issuer not found in trust registry and public key unavailable.'],
+                    null
+                );
+                return;
+            }
+
+            // Use the users table public key as fallback
+            $issuerPublicKey = $fallbackUser['public_key'];
+        } elseif ($registryEntry['status'] !== 'active') {
+            $this->renderVerifierDashboard(
+                ['type' => 'error', 'message' => '✗ The issuer of this credential is no longer a trusted issuer.'],
+                null
+            );
+            return;
+        } else {
+            $issuerPublicKey = $registryEntry['public_key'];
+        }
+
+        // ── STEP 3: Check for revocation before cryptographic verification ────
         if ($cred['status'] === 'revoked') {
             $this->renderVerifierDashboard(
                 ['type' => 'error', 'message' => 'This credential has been REVOKED by the issuer and is no longer valid.'],
@@ -258,24 +261,27 @@ $cred['issuer_public_key'] = $registryEntry['public_key'];
             return;
         }
 
-        // Verify hash
+        // ── STEP 4: Two-layer verification ────────────────────────────────────
+
+        // Layer 1: SHA-256 hash integrity
         $jsonldData = json_decode($cred['jsonld'], true);
         unset($jsonldData['proof']);
         $jsonldNoProof = json_encode($jsonldData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $computedHash  = hash('sha256', $jsonldNoProof);
         $hashIntact    = hash_equals($cred['file_hash'], $computedHash);
 
-        // Verify signature
+        // Layer 2: KAZ-SIGN-128 digital signature
         $engine         = new KazSignEngine();
         $signatureValid = $engine->verifySignature(
             $jsonldNoProof,
             $cred['signature'],
-            $cred['issuer_public_key']
+            $issuerPublicKey
         );
 
         $verified  = $hashIntact && $signatureValid;
         $newStatus = $verified ? 'verified' : 'rejected';
 
+        // ── STEP 5: Update credential status ──────────────────────────────────
         $stmt = Database::getInstance()->prepare(
             'UPDATE credentials SET status = :status WHERE id = :id'
         );
