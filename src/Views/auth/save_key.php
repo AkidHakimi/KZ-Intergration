@@ -186,7 +186,7 @@ function copyKey() {
     const btn = document.getElementById('copy-btn');
     ta.select();
     navigator.clipboard.writeText(ta.value).then(() => {
-        btn.textContent = '✓ Copied!';
+        btn.textContent = 'Copied!';
         btn.classList.add('copied');
         setTimeout(() => { btn.textContent = 'Copy Key'; btn.classList.remove('copied'); }, 2500);
     });
