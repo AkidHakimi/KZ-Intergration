@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard — KAZ-SIGN</title>
+    <title>Dashboard — VeriTrust</title>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
     <!-- QR Code generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -50,10 +50,8 @@
             text-decoration: none; margin-right: 32px;
         }
         .logo-mark {
-            width: 30px; height: 30px; background: var(--orange);
+            width: 30px; height: 30px;
             display: flex; align-items: center; justify-content: center;
-            font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
-            font-size: 13px; color: var(--white);
         }
         .brand-name {
             font-family: 'Barlow Condensed', sans-serif;
@@ -432,8 +430,20 @@ $credentialFields = [
 
 <nav class="site-nav">
     <a href="<?= $base ?>/" class="nav-brand">
-        <div class="logo-mark">KZ</div>
-        <span class="brand-name">KAZ-SIGN</span>
+        <svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg" style="width:32px;height:32px;flex-shrink:0;">
+            <path d="M50 5 L92 22 L92 58 C92 80 72 100 50 107 C28 100 8 80 8 58 L8 22 Z" fill="#C4540A"/>
+            <path d="M50 5 L92 22 L92 58 C92 80 72 100 50 107 C28 100 8 80 8 58 L8 22 Z" fill="#E8650A" opacity="0.9"/>
+            <path d="M50 12 L85 26 L85 58 C85 76 68 94 50 100 C32 94 15 76 15 58 L15 26 Z" fill="#F07A25" opacity="0.5"/>
+            <path d="M30 55 L44 70 L72 38" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="30" cy="55" r="4" fill="white" opacity="0.9"/>
+            <circle cx="72" cy="38" r="4" fill="white" opacity="0.9"/>
+            <line x1="72" y1="38" x2="85" y2="28" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>
+            <line x1="85" y1="28" x2="85" y2="20" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>
+            <line x1="85" y1="28" x2="93" y2="28" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>
+            <circle cx="85" cy="20" r="3" fill="white" opacity="0.85"/>
+            <circle cx="93" cy="28" r="3" fill="white" opacity="0.85"/>
+        </svg>
+        <span class="brand-name">Veri<span style="color:var(--orange);">Trust</span></span>
     </a>
 
     <a href="<?= $base ?>/" class="nav-link active">Dashboard</a>
@@ -860,7 +870,7 @@ $credentialFields = [
 <div id="qr-gen"></div>
 
 <footer class="site-footer">
-    <span>KAZ-SIGN System &mdash; Post-Quantum Digital Credentials</span>
+    <span>VeriTrust &mdash; Post-Quantum Digital Credentials</span>
     <span>KAZ-SIGN-128 Algorithm &nbsp;&middot;&nbsp; <?= date('Y') ?></span>
 </footer>
 
