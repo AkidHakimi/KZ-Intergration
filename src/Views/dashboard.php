@@ -403,7 +403,7 @@ $credentialFields = [
                 <button type="submit"
                         class="w-full rounded-lg bg-purple-600 px-5 py-2 text-xs font-bold uppercase tracking-widest
                                text-white hover:bg-purple-500 active:scale-95 transition-all">
-                    🔍 Verify by ID
+                    Verify by ID
                 </button>
             </form>
         </div>
