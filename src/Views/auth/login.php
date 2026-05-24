@@ -15,7 +15,7 @@
     <!-- Logo -->
     <div class="text-center space-y-2">
         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg">KZ</span>
-        <h1 class="text-xl font-semibold tracking-widest text-slate-100">KAZ&#8209;SIGN</h1>
+        <h1 class="text-xl font-semibold tracking-widest text-slate-100">Veri&#8209;Trust</h1>
         <p class="text-xs text-slate-500">Sign in to your account</p>
     </div>
 
