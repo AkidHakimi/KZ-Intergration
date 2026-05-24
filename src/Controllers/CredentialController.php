@@ -21,8 +21,8 @@ use KazSign\Core\KazSignEngine;
  * time. This is the identifier printed on the PDF certificate and is what
  * Verifiers use to look up a credential — replacing the old urn:uuid lookup.
  *
- *   Format : a plain 12-digit number
- *   Example: 100000482917
+ *   Format : a random 8-digit number
+ *   Example: 88903405
  *
  * The internal `credential_id` (urn:uuid:...) is still generated and stored as
  * the W3C VC Data Model `id` (a globally unique URI), but it is no longer the
@@ -405,45 +405,23 @@ final class CredentialController extends Controller
     /**
      * Generate a unique numeric certificate serial number.
      *
-     * Format: a plain 12-digit number   e.g. 100000482917
+     * Format: a random 8-digit number   e.g. 88903405
      *
-     * The number is sequential where possible — based on the current count of
-     * credentials plus a fixed base — and re-rolls with random digits on the
-     * rare chance of a collision against an existing credential.
+     * Re-rolls with a fresh random number on the rare chance of a collision
+     * against an existing credential's stored serial.
      */
     private function generateCertificateSerial(): string
     {
-        // Sequential base: start serials at 100000000000 and increment.
-        $base = 100000000000;
-
-        try {
-            $stmt = Database::getInstance()->prepare('SELECT COUNT(*) AS n FROM credentials');
-            $stmt->execute();
-            $row   = $stmt->fetch();
-            $count = (int) ($row['n'] ?? 0);
-        } catch (\Throwable $e) {
-            error_log('[KazSign] serial count failed: ' . $e->getMessage());
-            $count = 0;
-        }
-
-        // Try sequential numbers first.
-        for ($i = 1; $i <= 10; $i++) {
-            $serial = (string) ($base + $count + $i);
-            if (!$this->serialExists($serial)) {
-                return $serial;
-            }
-        }
-
-        // Fallback — random 12-digit number, re-rolled until unique.
-        for ($attempt = 0; $attempt < 20; $attempt++) {
-            $serial = (string) random_int(100000000000, 999999999999);
+        // Random 8-digit number, re-rolled until unique.
+        for ($attempt = 0; $attempt < 30; $attempt++) {
+            $serial = (string) random_int(10000000, 99999999);
             if (!$this->serialExists($serial)) {
                 return $serial;
             }
         }
 
         // Extremely unlikely final fallback.
-        return (string) random_int(100000000000, 999999999999);
+        return (string) random_int(10000000, 99999999);
     }
 
     /**
