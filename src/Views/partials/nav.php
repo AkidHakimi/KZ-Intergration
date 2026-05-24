@@ -5,7 +5,7 @@
             <!-- Brand -->
             <a href="<?= $base ?>/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
                 <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs">KZ</span>
-                <span class="text-sm font-semibold tracking-widest text-slate-100">KAZ&#8209;SIGN</span>
+                <span class="text-sm font-semibold tracking-widest text-slate-100">Veri&#8209;Trust</span>
             </a>
 
             <!-- Right side -->

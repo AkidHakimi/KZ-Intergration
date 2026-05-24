@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Save Your Private Key — KAZ-SIGN System</title>
+    <title>Save Your Private Key — VeriTrust System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -15,8 +15,8 @@
 
     <!-- Logo -->
     <div class="text-center space-y-2">
-        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg">KZ</span>
-        <h1 class="text-xl font-semibold tracking-widest">KAZ&#8209;SIGN</h1>
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg">VT</span>
+        <h1 class="text-xl font-semibold tracking-widest">Veri&#8209;Trust</h1>
     </div>
 
     <!-- Warning banner -->

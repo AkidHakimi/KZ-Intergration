@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard — KAZ-SIGN</title>
+    <title>Dashboard — VeriTrust</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <!-- QR Code generator -->
@@ -92,7 +92,7 @@ $credentialFields = [
             <h2 class="text-xs font-semibold text-blue-300 uppercase tracking-widest">Issuer Identity</h2>
             <div class="flex gap-2">
                 <span class="rounded-full border border-purple-700 bg-purple-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-purple-300">PQC</span>
-                <span class="rounded-full border border-blue-700 bg-blue-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-blue-300">KAZ-SIGN v1</span>
+                <span class="rounded-full border border-blue-700 bg-blue-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-blue-300">VeriTrust v1</span>
             </div>
         </div>
         <div class="space-y-1">
@@ -143,7 +143,7 @@ $credentialFields = [
 
             <!-- Auto-generated Certificate Serial notice -->
             <div class="rounded-lg border border-emerald-800/60 bg-emerald-900/10 px-4 py-3 flex items-start gap-3">
-                <span class="text-emerald-400 text-sm mt-0.5">🔢</span>
+                <span class="text-emerald-400 text-sm mt-0.5"></span>
                 <div class="space-y-0.5">
                     <p class="text-[11px] font-semibold text-emerald-300">Certificate Serial No. — Auto-generated</p>
                     <p class="text-[10px] text-slate-500">
@@ -457,7 +457,7 @@ $credentialFields = [
         <?php endif; ?>
 
         <h2 class="text-sm font-semibold <?= $revoked ? 'text-orange-300' : (($result['verified'] ?? false) ? 'text-emerald-300' : 'text-red-300') ?>">
-            <?= $revoked ? 'Credential Revoked' : (($result['verified'] ?? false) ? '✓ Credential Verified' : '✗ Verification Failed') ?>
+            <?= $revoked ? 'Credential Revoked' : (($result['verified'] ?? false) ? 'Credential Verified' : 'Verification Failed') ?>
         </h2>
 
         <?php if (!$revoked): ?>
@@ -466,14 +466,14 @@ $credentialFields = [
                 <span class="text-xs text-slate-400">SHA-256 Hash Integrity</span>
                 <span class="text-[10px] font-bold rounded-full px-3 py-0.5 border
                     <?= ($result['hash_intact'] ?? false) ? 'border-emerald-700 bg-emerald-900/30 text-emerald-400' : 'border-red-800 bg-red-950/40 text-red-400' ?>">
-                    <?= ($result['hash_intact'] ?? false) ? 'Intact ✓' : 'MODIFIED ✗' ?>
+                    <?= ($result['hash_intact'] ?? false) ? 'Intact' : 'MODIFIED' ?>
                 </span>
             </div>
             <div class="flex items-center justify-between rounded-lg bg-slate-800 px-4 py-3">
                 <span class="text-xs text-slate-400">KAZ-SIGN PQC Signature</span>
                 <span class="text-[10px] font-bold rounded-full px-3 py-0.5 border
                     <?= ($result['signature_valid'] ?? false) ? 'border-emerald-700 bg-emerald-900/30 text-emerald-400' : 'border-red-800 bg-red-950/40 text-red-400' ?>">
-                    <?= ($result['signature_valid'] ?? false) ? 'Valid ✓' : 'Invalid ✗' ?>
+                    <?= ($result['signature_valid'] ?? false) ? 'Valid' : 'Invalid' ?>
                 </span>
             </div>
         </div>
