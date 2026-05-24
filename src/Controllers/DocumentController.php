@@ -9,281 +9,195 @@ use KazSign\Core\Database;
 use KazSign\Core\KazSignEngine;
 
 /**
- * CredentialController
+ * DocumentController
  *
- * Handles JSON-LD Verifiable Credential lifecycle:
- *   issue()  — Issuer creates and signs a credential for a Holder
- *   verify() — Verifier checks a credential by its ID
- *   show()   — Holder views a single credential as JSON-LD
+ * Handles file upload and per-document signature verification:
+ *   index()      — list documents for the logged-in user  (GET  /documents)
+ *   uploadForm() — show upload form                       (GET  /documents/upload)
+ *   upload()     — receive file, hash, sign, persist      (POST /documents/upload)
+ *   verify()     — re-verify a stored document            (GET  /documents/:id/verify)
  */
-final class CredentialController extends Controller
+final class DocumentController extends Controller
 {
-    // -------------------------------------------------------------------------
-    // POST /credentials/issue  (Issuer only)
-    // -------------------------------------------------------------------------
-
-    public function issue(array $params = []): void
-    {
-        $this->requireAuth();
-        $this->requireRole('issuer');
-        $this->validateCsrf();
-
-        $holderId       = (int) ($_POST['holder_id']       ?? 0);
-        $credentialType = trim($_POST['credential_type']   ?? 'AcademicCredential');
-        $subjectData    = trim($_POST['subject_data']      ?? '');
-
-        if ($holderId === 0 || $subjectData === '') {
-            $this->flashAndRedirect('error', 'Holder and subject data are required.', '/');
-        }
-
-        // Verify holder exists
-        $stmt = Database::getInstance()->prepare(
-            'SELECT u.id, u.username, u.public_key, h.full_name, h.id_number
-               FROM users u JOIN holders h ON h.user_id = u.id
-              WHERE u.id = :id LIMIT 1'
-        );
-        $stmt->execute([':id' => $holderId]);
-        $holder = $stmt->fetch();
-
-        if (!$holder) {
-            $this->flashAndRedirect('error', 'Holder not found.', '/');
-        }
-
-        // Get issuer info
-        $stmt = Database::getInstance()->prepare(
-            'SELECT u.username, u.public_key, i.organisation
-               FROM users u JOIN issuers i ON i.user_id = u.id
-              WHERE u.id = :id LIMIT 1'
-        );
-        $stmt->execute([':id' => $this->authUserId()]);
-        $issuer = $stmt->fetch();
-
-        // Build JSON-LD Verifiable Credential
-        $credentialId = 'urn:uuid:' . $this->generateUuid();
-        $issuedAt     = date('c'); // ISO 8601
-
-        // Parse subject data — accept JSON or plain text
-        $subjectJson = json_decode($subjectData, true);
-        if (!is_array($subjectJson)) {
-            // Plain text — wrap it
-            $subjectJson = ['description' => $subjectData];
-        }
-
-        $credential = [
-            '@context' => [
-                'https://www.w3.org/2018/credentials/v1',
-                'https://www.w3.org/2018/credentials/examples/v1',
-            ],
-            'id'   => $credentialId,
-            'type' => ['VerifiableCredential', $credentialType],
-            'issuer' => [
-                'id'           => 'did:kazsign:' . hash('sha256', $issuer['username']),
-                'name'         => $issuer['organisation'],
-                'publicKey'    => $issuer['public_key'],
-            ],
-            'issuanceDate'      => $issuedAt,
-            'credentialSubject' => array_merge([
-                'id'       => 'did:kazsign:' . hash('sha256', $holder['username']),
-                'name'     => $holder['full_name'],
-                'idNumber' => $holder['id_number'],
-            ], $subjectJson),
-        ];
-
-        $jsonld    = json_encode($credential, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $fileHash  = hash('sha256', $jsonld);
-
-        // Sign with private key
-        $privateKey = $_SESSION['private_key'] ?? null;
-        if ($privateKey === null) {
-            $this->flashAndRedirect('error', 'No private key in session. Log out and log back in with your key.', '/');
-        }
-
-        try {
-            $engine    = new KazSignEngine();
-            $signature = $engine->signData($jsonld, $privateKey);
-        } catch (\Throwable $e) {
-            error_log('[KazSign] Signing failed: ' . $e->getMessage());
-            $this->flashAndRedirect('error', 'Signing failed. Check server logs.', '/');
-        }
-
-        // Add proof to the credential
-        $credential['proof'] = [
-            'type'               => 'KazSign2024',
-            'created'            => $issuedAt,
-            'verificationMethod' => 'did:kazsign:' . hash('sha256', $issuer['username']),
-            'proofValue'         => $signature,
-        ];
-
-        $signedJsonld = json_encode($credential, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-
-        // Persist to DB
-        try {
-            $stmt = Database::getInstance()->prepare(
-                'INSERT INTO credentials
-                    (issuer_id, holder_id, credential_id, subject, jsonld, signature, file_hash, status)
-                 VALUES
-                    (:issuer_id, :holder_id, :credential_id, :subject, :jsonld, :signature, :file_hash, :status)'
-            );
-            $stmt->execute([
-                ':issuer_id'     => $this->authUserId(),
-                ':holder_id'     => $holderId,
-                ':credential_id' => $credentialId,
-                ':subject'       => json_encode($subjectJson),
-                ':jsonld'        => $signedJsonld,
-                ':signature'     => $signature,
-                ':file_hash'     => $fileHash,
-                ':status'        => 'issued',
-            ]);
-        } catch (\Throwable $e) {
-            error_log('[KazSign] Credential insert failed: ' . $e->getMessage());
-            $this->flashAndRedirect('error', 'Database error saving credential.', '/');
-        }
-
-        $this->flashAndRedirect('success', "Credential issued to {$holder['full_name']} successfully.", '/');
-    }
+    private const UPLOAD_DIR     = ROOT_PATH . '/uploads/';
+    private const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
     // -------------------------------------------------------------------------
-    // GET /credentials/:id/show  (Holder views JSON-LD)
+    // GET /documents
     // -------------------------------------------------------------------------
 
-    public function show(array $params = []): void
+    public function index(array $params = []): void
     {
         $this->requireAuth();
 
-        $credId = (int) ($params['id'] ?? 0);
-        $cred   = $this->findCredential($credId);
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM documents WHERE user_id = :uid ORDER BY created_at DESC'
+        );
+        $stmt->execute([':uid' => $this->authUserId()]);
+        $documents = $stmt->fetchAll() ?: [];
 
-        if (!$cred) {
-            $this->flashAndRedirect('error', 'Credential not found.', '/');
-        }
-
-        // Only holder or issuer of this credential can view it
-        $userId = $this->authUserId();
-        if ($cred['holder_id'] != $userId && $cred['issuer_id'] != $userId) {
-            $this->flashAndRedirect('error', 'Access denied.', '/');
-        }
-
-        $this->render('holder.credential_show', [
-            'credential' => $cred,
-            'jsonld'     => json_decode($cred['jsonld'], true),
-            'flash'      => $this->consumeFlash(),
-            'csrf_token' => $this->generateCsrfToken(),
+        $this->render('dashboard', [
+            'credentials'    => [],
+            'holders'        => [],
+            'documents'      => $documents,
+            'flash'          => $this->consumeFlash(),
+            'csrf_token'     => $this->generateCsrfToken(),
+            'result'         => null,
         ]);
     }
 
     // -------------------------------------------------------------------------
-    // POST /credentials/verify  (Verifier)
+    // GET /documents/upload
+    // -------------------------------------------------------------------------
+
+    public function uploadForm(array $params = []): void
+    {
+        $this->requireAuth();
+
+        $this->render('dashboard', [
+            'credentials' => [],
+            'holders'     => [],
+            'documents'   => [],
+            'flash'       => $this->consumeFlash(),
+            'csrf_token'  => $this->generateCsrfToken(),
+            'result'      => null,
+        ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /documents/upload
+    // -------------------------------------------------------------------------
+
+    public function upload(array $params = []): void
+    {
+        $this->requireAuth();
+        $this->validateCsrf();
+
+        // ── File validation ───────────────────────────────────────────────────
+        if (empty($_FILES['document']) || $_FILES['document']['error'] !== UPLOAD_ERR_OK) {
+            $this->flashAndRedirect('error', 'No file uploaded or upload error occurred.', '/documents/upload');
+        }
+
+        $tmpPath  = $_FILES['document']['tmp_name'];
+        $origName = basename($_FILES['document']['name']);
+        $size     = $_FILES['document']['size'];
+
+        if ($size > self::MAX_SIZE_BYTES) {
+            $this->flashAndRedirect('error', 'File exceeds the 10 MB size limit.', '/documents/upload');
+        }
+
+        if (!is_uploaded_file($tmpPath)) {
+            $this->flashAndRedirect('error', 'Invalid upload.', '/documents/upload');
+        }
+
+        // ── Hash the file ─────────────────────────────────────────────────────
+        $fileHash = hash_file('sha256', $tmpPath);
+
+        // ── Sign the hash ─────────────────────────────────────────────────────
+        $privateKey = $_SESSION['private_key'] ?? null;
+        $signature  = '';
+        $status     = 'pending';
+
+        if ($privateKey !== null) {
+            try {
+                $engine    = new KazSignEngine();
+                $signature = $engine->signData($fileHash, $privateKey);
+                $status    = 'signed';
+            } catch (\Throwable $e) {
+                error_log('[KazSign] Document signing failed: ' . $e->getMessage());
+                // Continue without signature — stored as pending
+            }
+        }
+
+        // ── Persist the upload ────────────────────────────────────────────────
+        if (!is_dir(self::UPLOAD_DIR)) {
+            mkdir(self::UPLOAD_DIR, 0755, true);
+        }
+
+        $storedName = date('Ymd_His') . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $origName);
+        move_uploaded_file($tmpPath, self::UPLOAD_DIR . $storedName);
+
+        try {
+            $stmt = Database::getInstance()->prepare(
+                'INSERT INTO documents (user_id, file_name, file_hash, signature, status)
+                 VALUES (:user_id, :file_name, :file_hash, :signature, :status)'
+            );
+            $stmt->execute([
+                ':user_id'   => $this->authUserId(),
+                ':file_name' => $origName,
+                ':file_hash' => $fileHash,
+                ':signature' => $signature,
+                ':status'    => $status,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[KazSign] Document DB insert failed: ' . $e->getMessage());
+            $this->flashAndRedirect('error', 'Database error saving document.', '/documents/upload');
+        }
+
+        $msg = $status === 'signed'
+            ? "Document uploaded and signed successfully."
+            : "Document uploaded (no private key loaded — stored as pending, not signed).";
+
+        $this->flashAndRedirect('success', $msg, '/');
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /documents/:id/verify
     // -------------------------------------------------------------------------
 
     public function verify(array $params = []): void
     {
         $this->requireAuth();
-        $this->requireRole('verifier');
-        $this->validateCsrf();
 
-        $credentialId = trim($_POST['credential_id'] ?? '');
+        $docId = (int) ($params['id'] ?? 0);
 
-        if ($credentialId === '') {
-            $this->flashAndRedirect('error', 'Please enter a credential ID.', '/');
-        }
-
-        // Find credential
         $stmt = Database::getInstance()->prepare(
-            'SELECT c.*, u.public_key AS issuer_public_key
-               FROM credentials c
-               JOIN users u ON u.id = c.issuer_id
-              WHERE c.credential_id = :cid LIMIT 1'
+            'SELECT d.*, u.public_key
+               FROM documents d
+               JOIN users u ON u.id = d.user_id
+              WHERE d.id = :id LIMIT 1'
         );
-        $stmt->execute([':cid' => $credentialId]);
-        $cred = $stmt->fetch();
+        $stmt->execute([':id' => $docId]);
+        $doc = $stmt->fetch();
 
-        if (!$cred) {
-            $this->renderVerifierResult(null, 'Credential ID not found in the system.', false);
-            return;
+        if (!$doc) {
+            $this->flashAndRedirect('error', 'Document not found.', '/');
         }
 
-        // Recompute hash of the jsonld (without proof)
-        $jsonldData  = json_decode($cred['jsonld'], true);
-        $proofBackup = $jsonldData['proof'] ?? null;
-        unset($jsonldData['proof']);
-        $jsonldNoProof   = json_encode($jsonldData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $computedHash    = hash('sha256', $jsonldNoProof);
-        $hashIntact      = hash_equals($cred['file_hash'], $computedHash);
+        if ((int)$doc['user_id'] !== $this->authUserId()) {
+            $this->flashAndRedirect('error', 'Access denied.', '/');
+        }
 
-        // Verify signature
+        if (empty($doc['signature'])) {
+            $this->flashAndRedirect('error', 'This document has no signature to verify.', '/');
+        }
+
         $engine         = new KazSignEngine();
         $signatureValid = $engine->verifySignature(
-            $jsonldNoProof,
-            $cred['signature'],
-            $cred['issuer_public_key']
+            $doc['file_hash'],
+            $doc['signature'],
+            $doc['public_key']
         );
 
-        $verified  = $hashIntact && $signatureValid;
-        $newStatus = $verified ? 'verified' : 'rejected';
+        $newStatus = $signatureValid ? 'verified' : 'rejected';
 
-        // Update status
         $stmt = Database::getInstance()->prepare(
-            'UPDATE credentials SET status = :status WHERE id = :id'
+            'UPDATE documents SET status = :status WHERE id = :id'
         );
-        $stmt->execute([':status' => $newStatus, ':id' => $cred['id']]);
+        $stmt->execute([':status' => $newStatus, ':id' => $docId]);
 
-        $this->renderVerifierResult(
-            $cred,
-            $verified ? 'Credential is authentic and untampered.' : 'Verification FAILED.',
-            $verified,
-            $hashIntact,
+        $this->flashAndRedirect(
+            $signatureValid ? 'success' : 'error',
             $signatureValid
+                ? "Document verified — signature is valid."
+                : "Verification failed — signature is invalid or document was modified.",
+            '/'
         );
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
-
-    private function renderVerifierResult(
-        ?array $cred,
-        string $message,
-        bool   $verified,
-        bool   $hashIntact     = false,
-        bool   $signatureValid = false
-    ): void {
-        $this->render('verifier.dashboard', [
-            'flash'      => ['type' => $verified ? 'success' : 'error', 'message' => $message],
-            'csrf_token' => $this->generateCsrfToken(),
-            'result'     => $cred ? [
-                'credential'      => $cred,
-                'jsonld'          => json_decode($cred['jsonld'], true),
-                'hash_intact'     => $hashIntact,
-                'signature_valid' => $signatureValid,
-                'verified'        => $verified,
-            ] : null,
-        ]);
-    }
-
-    private function findCredential(int $id): ?array
-    {
-        $stmt = Database::getInstance()->prepare(
-            'SELECT * FROM credentials WHERE id = :id LIMIT 1'
-        );
-        $stmt->execute([':id' => $id]);
-        $row = $stmt->fetch();
-        return $row ?: null;
-    }
-
-    private function requireRole(string $role): void
-    {
-        if (($_SESSION['role'] ?? '') !== $role) {
-            $this->flashAndRedirect('error', "Access denied. This page is for {$role}s only.", '/');
-        }
-    }
-
-    private function generateUuid(): string
-    {
-        $data    = random_bytes(16);
-        $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
-        $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
-        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
-    }
 
     private function validateCsrf(): void
     {
