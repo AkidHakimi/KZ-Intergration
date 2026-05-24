@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Register — KAZ-SIGN</title>
+    <title>Register — VeriTrust</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <style> body { font-family: 'JetBrains Mono', monospace; } </style>
@@ -14,7 +14,7 @@
 
     <!-- Logo -->
     <div class="text-center space-y-2">
-        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg">KZ</span>
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg">VT</span>
         <h1 class="text-xl font-semibold tracking-widest">Veri&#8209;Trust</h1>
         <p class="text-xs text-slate-500">Create your account</p>
     </div>
