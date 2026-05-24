@@ -792,7 +792,7 @@ $credentialFields = [
         <div style="flex:1;">
             <div class="verify-result">
                 <div class="verify-result-head <?= $headClass ?>">
-                    <span class="verify-result-icon"><?= $revoked ? '' : ($verified ? '✓' : '✗') ?></span>
+                    <span class="verify-result-icon"><?= $revoked ? '' : ($verified ? '' : '') ?></span>
                     <div class="verify-result-text">
                         <h3><?= $revoked ? 'Credential Revoked' : ($verified ? 'Credential Valid' : 'Verification Failed') ?></h3>
                         <p>
@@ -911,7 +911,7 @@ function toggleJsonLd(id, btn) {
 function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
         const orig = btn.textContent;
-        btn.textContent = '✓ Copied';
+        btn.textContent = 'Copied';
         setTimeout(() => btn.textContent = orig, 2000);
     });
 }
