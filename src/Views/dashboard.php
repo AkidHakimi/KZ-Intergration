@@ -1,520 +1,870 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard — VeriTrust</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <title>Dashboard — KAZ-SIGN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
     <!-- QR Code generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <!-- jsPDF for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <style> body { font-family: 'JetBrains Mono', monospace; } </style>
-</head>
-<body class="min-h-full bg-slate-950 text-slate-100">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --orange:       #E8650A;
+            --orange-light: #FFF0E6;
+            --orange-mid:   #F9D5BB;
+            --orange-dark:  #C4540A;
+            --ink:          #1A1A1A;
+            --ink-mid:      #555555;
+            --ink-light:    #888888;
+            --rule:         #E0E0E0;
+            --rule-strong:  #C8C8C8;
+            --surface:      #F5F5F5;
+            --white:        #FFFFFF;
+            --green:        #1A7A4A;
+            --green-bg:     #EFF9F4;
+            --red:          #C0392B;
+            --red-bg:       #FDF0EF;
+            --blue:         #1A4F9A;
+            --blue-bg:      #EEF3FC;
+        }
+        body {
+            font-family: 'Barlow', sans-serif;
+            background: var(--surface); color: var(--ink);
+            min-height: 100vh; display: flex; flex-direction: column;
+        }
 
+        /* Top accent */
+        .top-stripe { height: 4px; background: var(--orange); }
+
+        /* Site nav */
+        .site-nav {
+            background: var(--white); border-bottom: 1px solid var(--rule);
+            padding: 0 32px; height: 56px;
+            display: flex; align-items: center; gap: 0;
+        }
+        .nav-brand {
+            display: flex; align-items: center; gap: 10px;
+            text-decoration: none; margin-right: 32px;
+        }
+        .logo-mark {
+            width: 30px; height: 30px; background: var(--orange);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+            font-size: 13px; color: var(--white);
+        }
+        .brand-name {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 600; font-size: 17px; letter-spacing: 2px;
+            color: var(--ink); text-transform: uppercase;
+        }
+        .nav-link {
+            font-size: 12px; color: var(--ink-mid); text-decoration: none;
+            padding: 0 14px; height: 56px; display: flex; align-items: center;
+            border-bottom: 2px solid transparent; font-weight: 500;
+            letter-spacing: 0.3px; transition: all 0.1s; text-transform: uppercase;
+        }
+        .nav-link:hover { color: var(--orange); }
+        .nav-link.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+        .nav-right {
+            margin-left: auto; display: flex; align-items: center; gap: 16px;
+        }
+        .role-pill {
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.8px; padding: 3px 10px; border-radius: 2px;
+        }
+        .role-pill.issuer   { background: var(--blue-bg);  color: var(--blue); }
+        .role-pill.holder   { background: var(--green-bg); color: var(--green); }
+        .role-pill.verifier { background: var(--orange-light); color: var(--orange-dark); }
+
+        .pqc-pill {
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; padding: 3px 10px; border-radius: 2px;
+            border: 1px solid var(--orange-mid); color: var(--orange-dark);
+            background: var(--orange-light);
+        }
+        .pqc-pill.off {
+            border-color: var(--rule); color: var(--ink-light); background: var(--surface);
+        }
+
+        .nav-user {
+            display: flex; align-items: center; gap: 12px;
+            padding-left: 16px; border-left: 1px solid var(--rule);
+        }
+        .nav-username { font-size: 13px; color: var(--ink-mid); font-weight: 500; }
+        .nav-logout {
+            font-size: 12px; color: var(--red); text-decoration: none;
+            font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .nav-logout:hover { color: #9B1E1E; }
+
+        /* Page structure */
+        .page-wrap {
+            max-width: 1100px; margin: 0 auto;
+            padding: 28px 32px 48px; flex: 1; width: 100%;
+        }
+
+        /* Page header row */
+        .page-header {
+            display: flex; align-items: flex-end; justify-content: space-between;
+            margin-bottom: 24px; padding-bottom: 16px;
+            border-bottom: 1px solid var(--rule);
+        }
+        .page-title {
+            font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+            font-size: 24px; letter-spacing: 1px; text-transform: uppercase; color: var(--ink);
+        }
+        .page-title span { color: var(--orange); }
+
+        /* Flash message */
+        .flash {
+            padding: 12px 16px; font-size: 13px; margin-bottom: 20px;
+            border-left: 3px solid;
+        }
+        .flash.success { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+        .flash.error   { background: var(--red-bg);   color: var(--red);   border-color: var(--red); }
+        .flash.warning { background: #FFF8E6;           color: #7A5A00;      border-color: #E0A800; }
+
+        /* Section heading */
+        .section-head {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 12px;
+        }
+        .section-title {
+            font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+            font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink);
+        }
+        .count-badge {
+            font-size: 11px; font-weight: 600; color: var(--ink-light);
+            background: var(--surface); border: 1px solid var(--rule);
+            padding: 1px 8px; border-radius: 2px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--white); border: 1px solid var(--rule);
+            margin-bottom: 20px;
+        }
+        .card-head {
+            padding: 16px 20px; border-bottom: 1px solid var(--rule);
+            background: #FAFAFA; display: flex; align-items: center; justify-content: space-between;
+        }
+        .card-head-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700; font-size: 14px; text-transform: uppercase;
+            letter-spacing: 0.8px; color: var(--ink);
+        }
+        .card-body { padding: 20px; }
+
+        /* DID identity card */
+        .identity-bar {
+            background: var(--white); border: 1px solid var(--rule);
+            border-left: 4px solid var(--orange);
+            padding: 14px 20px; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 20px;
+        }
+        .identity-label {
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--ink-light); font-weight: 500; flex-shrink: 0;
+        }
+        .identity-did {
+            font-family: 'Courier New', monospace; font-size: 12px;
+            color: var(--orange-dark); flex: 1; word-break: break-all;
+        }
+        .btn-copy-did {
+            background: var(--white); border: 1px solid var(--rule);
+            color: var(--ink-mid); font-size: 11px; font-weight: 500;
+            padding: 5px 12px; cursor: pointer; flex-shrink: 0;
+            text-transform: uppercase; letter-spacing: 0.3px; border-radius: 2px;
+            transition: all 0.1s;
+        }
+        .btn-copy-did:hover { border-color: var(--orange); color: var(--orange); }
+
+        /* Form fields */
+        .field { margin-bottom: 14px; }
+        .field-label {
+            display: block; font-size: 11px; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.7px;
+            color: var(--ink-mid); margin-bottom: 5px;
+        }
+        .field input, .field select, .field textarea {
+            width: 100%; border: 1px solid var(--rule);
+            background: var(--white); padding: 9px 12px;
+            font-size: 13px; font-family: 'Barlow', sans-serif;
+            color: var(--ink); outline: none; border-radius: 2px;
+            transition: border-color 0.12s;
+        }
+        .field input:focus, .field select:focus, .field textarea:focus {
+            border-color: var(--orange); box-shadow: 0 0 0 3px rgba(232,101,10,0.07);
+        }
+        .field textarea { resize: vertical; min-height: 80px; }
+        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+        /* Auto-serial notice */
+        .auto-serial-notice {
+            background: var(--orange-light); border: 1px solid var(--orange-mid);
+            padding: 10px 14px; display: flex; gap: 10px; align-items: flex-start;
+            margin-bottom: 14px;
+        }
+        .auto-serial-notice p { font-size: 12px; color: #7A3800; line-height: 1.5; }
+        .auto-serial-notice strong { color: var(--orange-dark); }
+
+        /* Buttons */
+        .btn-primary {
+            background: var(--orange); color: var(--white); border: none;
+            padding: 10px 20px; font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px; font-weight: 700; letter-spacing: 1.2px;
+            text-transform: uppercase; cursor: pointer; border-radius: 2px;
+            transition: background 0.12s;
+        }
+        .btn-primary:hover { background: var(--orange-dark); }
+        .btn-primary:disabled { background: #CCCCCC; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: var(--white); color: var(--ink-mid); border: 1px solid var(--rule);
+            padding: 9px 18px; font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px; font-weight: 600; letter-spacing: 0.8px;
+            text-transform: uppercase; cursor: pointer; border-radius: 2px;
+            transition: all 0.12s;
+        }
+        .btn-secondary:hover { border-color: var(--orange); color: var(--orange); }
+
+        /* Table */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table thead tr {
+            background: #F7F7F7; border-bottom: 2px solid var(--rule);
+        }
+        .data-table th {
+            padding: 10px 14px; text-align: left;
+            font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.8px; color: var(--ink-mid);
+        }
+        .data-table td {
+            padding: 11px 14px; font-size: 13px; color: var(--ink);
+            border-bottom: 1px solid var(--rule);
+        }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+        .data-table tbody tr:hover td { background: #FAFAFA; }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 2px 8px; border-radius: 2px;
+        }
+        .status-issued   { background: var(--blue-bg);    color: var(--blue); }
+        .status-verified { background: var(--green-bg);   color: var(--green); }
+        .status-rejected { background: var(--red-bg);     color: var(--red); }
+        .status-revoked  { background: #FEF3E6;           color: #A04000; }
+
+        .cert-serial {
+            font-family: 'Courier New', monospace; font-size: 13px;
+            font-weight: 600; color: var(--orange-dark); letter-spacing: 1px;
+        }
+
+        /* Action links */
+        .action-link {
+            font-size: 11px; color: var(--orange); text-decoration: none;
+            font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;
+            cursor: pointer; background: none; border: none; padding: 0;
+        }
+        .action-link:hover { text-decoration: underline; }
+        .action-link.danger { color: var(--red); }
+        .action-link.muted  { color: var(--ink-mid); }
+
+        /* JSON-LD viewer */
+        .jsonld-viewer {
+            display: none; padding: 14px 16px;
+            background: #F7F7F7; border-top: 1px solid var(--rule);
+        }
+        .jsonld-viewer pre {
+            font-family: 'Courier New', monospace; font-size: 11px;
+            color: #4A2600; line-height: 1.7; white-space: pre-wrap;
+            word-break: break-all; max-height: 300px; overflow-y: auto;
+        }
+
+        /* Holder credential cards */
+        .cred-card {
+            background: var(--white); border: 1px solid var(--rule);
+            margin-bottom: 16px;
+        }
+        .cred-card-head {
+            padding: 14px 20px; border-bottom: 1px solid var(--rule);
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        .cred-type {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700; font-size: 16px; letter-spacing: 0.5px;
+            text-transform: uppercase; color: var(--orange-dark);
+        }
+        .cred-meta { font-size: 11px; color: var(--ink-light); margin-top: 2px; }
+
+        .cred-serial-bar {
+            background: var(--orange-light); border-bottom: 1px solid var(--orange-mid);
+            padding: 10px 20px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .serial-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--orange-dark); font-weight: 600; }
+        .serial-value { font-family: 'Courier New', monospace; font-size: 18px; font-weight: 700; color: var(--orange-dark); letter-spacing: 2px; }
+
+        .cred-fields { padding: 16px 20px; }
+        .field-row-display {
+            display: flex; gap: 16px; padding: 6px 0;
+            border-bottom: 1px solid #F0F0F0; font-size: 13px;
+        }
+        .field-row-display:last-child { border-bottom: none; }
+        .frd-key { color: var(--ink-light); width: 160px; flex-shrink: 0; font-size: 12px; }
+        .frd-val { color: var(--ink); }
+
+        .cred-actions {
+            padding: 12px 20px; border-top: 1px solid var(--rule);
+            display: flex; gap: 20px; align-items: center;
+            background: #FAFAFA;
+        }
+
+        /* Verifier section */
+        .verify-form-wrap {
+            max-width: 480px;
+        }
+        .verify-input {
+            width: 100%; border: 2px solid var(--rule);
+            background: var(--white); padding: 12px 16px;
+            font-size: 20px; font-family: 'Courier New', monospace;
+            color: var(--ink); outline: none; border-radius: 2px;
+            letter-spacing: 3px; text-align: center;
+            transition: border-color 0.12s;
+        }
+        .verify-input:focus { border-color: var(--orange); }
+        .verify-hint {
+            font-size: 12px; color: var(--ink-light); margin-top: 6px; text-align: center;
+        }
+        .btn-verify {
+            width: 100%; background: var(--orange); color: var(--white); border: none;
+            padding: 13px; margin-top: 14px;
+            font-family: 'Barlow Condensed', sans-serif; font-size: 16px;
+            font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+            cursor: pointer; border-radius: 2px; transition: background 0.12s;
+        }
+        .btn-verify:hover { background: var(--orange-dark); }
+
+        /* Verification result */
+        .verify-result {
+            background: var(--white); border: 1px solid var(--rule);
+        }
+        .verify-result-head {
+            padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+        }
+        .verify-result-head.pass { border-left: 5px solid var(--green); background: var(--green-bg); }
+        .verify-result-head.fail { border-left: 5px solid var(--red);   background: var(--red-bg); }
+        .verify-result-head.revoked { border-left: 5px solid #E07800; background: #FEF3E6; }
+        .verify-result-icon { font-size: 24px; }
+        .verify-result-text h3 {
+            font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+            font-size: 18px; letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .verify-result-text p { font-size: 12px; margin-top: 2px; }
+        .verify-result-head.pass h3 { color: var(--green); }
+        .verify-result-head.pass p  { color: #2E8060; }
+        .verify-result-head.fail h3 { color: var(--red); }
+        .verify-result-head.fail p  { color: #9B2020; }
+        .verify-result-head.revoked h3 { color: #A04000; }
+        .verify-result-head.revoked p  { color: #805000; }
+
+        .verify-checks {
+            padding: 16px 20px; border-bottom: 1px solid var(--rule);
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }
+        .check-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #F7F7F7; padding: 10px 14px;
+        }
+        .check-item-label { font-size: 12px; color: var(--ink-mid); }
+        .check-pass { font-size: 11px; font-weight: 600; color: var(--green); text-transform: uppercase; }
+        .check-fail { font-size: 11px; font-weight: 600; color: var(--red);   text-transform: uppercase; }
+
+        .verify-details {
+            padding: 16px 20px;
+        }
+        .details-title {
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--ink-light); font-weight: 600; margin-bottom: 10px;
+        }
+
+        /* Empty states */
+        .empty-state {
+            background: var(--white); border: 1px solid var(--rule);
+            padding: 48px; text-align: center;
+        }
+        .empty-state p { font-size: 14px; color: var(--ink-light); }
+
+        /* Footer */
+        .site-footer {
+            background: var(--white); border-top: 1px solid var(--rule);
+            padding: 14px 32px; display: flex; justify-content: space-between;
+        }
+        .site-footer span { font-size: 11px; color: var(--ink-light); }
+
+        /* Hidden qr generator */
+        #qr-gen { position: absolute; left: -9999px; top: 0; width: 200px; background: #fff; padding: 8px; }
+    </style>
+</head>
+<body>
 <?php
 $role      = $_SESSION['role'] ?? 'holder';
 $did       = $_SESSION['did']  ?? ('did:kazsign:' . hash('sha256', $_SESSION['username'] ?? ''));
-$roleColor = match($role) {
-    'issuer'   => 'border-blue-700 bg-blue-900/30 text-blue-300',
-    'verifier' => 'border-purple-700 bg-purple-900/30 text-purple-300',
-    default    => 'border-emerald-700 bg-emerald-900/30 text-emerald-300',
-};
-$roleIcon = match($role) { 'issuer' => '', 'verifier' => '', default => '' };
+$username  = $_SESSION['username'] ?? 'user';
+$hasKey    = !empty($_SESSION['private_key']);
 
-// NOTE: certificateSerial is NO LONGER a manual input field.
-// It is auto-generated by the system at issuance time (see CredentialController::issue()).
-// It is a plain numeric serial number, e.g. 88903405
 $credentialFields = [
     'AcademicCredential' => [
-        ['key' => 'name',              'label' => 'Name',                 'type' => 'text',     'placeholder' => 'e.g. RAJA HAZEERA NAJWA'],
-        ['key' => 'awardNameEnglish',  'label' => 'Award Name (English)', 'type' => 'text',     'placeholder' => 'e.g. BACHELOR OF EDUCATION WITH HONOURS'],
-        ['key' => 'awardNameMalay',    'label' => 'Award Name (Malay)',   'type' => 'textarea', 'placeholder' => 'e.g. SARJANA MUDA PENDIDIKAN DENGAN KEPUJIAN'],
-        ['key' => 'senateDate',        'label' => 'Senate Date',          'type' => 'text',     'placeholder' => 'e.g. 28 AUGUST 2024'],
-        ['key' => 'convocationYear',   'label' => 'Convocation Year',     'type' => 'text',     'placeholder' => 'e.g. 2024'],
+        ['key' => 'name',             'label' => 'Full Name',             'placeholder' => 'e.g. RAJA HAZEERA NAJWA'],
+        ['key' => 'awardNameEnglish', 'label' => 'Award Name (English)',  'placeholder' => 'e.g. BACHELOR OF EDUCATION WITH HONOURS'],
+        ['key' => 'awardNameMalay',   'label' => 'Award Name (Malay)',    'placeholder' => 'e.g. SARJANA MUDA PENDIDIKAN DENGAN KEPUJIAN', 'type' => 'textarea'],
+        ['key' => 'senateDate',       'label' => 'Senate Date',           'placeholder' => 'e.g. 28 AUGUST 2024'],
+        ['key' => 'convocationYear',  'label' => 'Convocation Year',      'placeholder' => 'e.g. 2024'],
     ],
 ];
 ?>
 
-<!-- NAV -->
-<nav class="border-b border-slate-800 bg-slate-900">
-    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div class="flex h-14 items-center justify-between">
-            <a href="<?= $base ?>/" class="flex items-center gap-2.5 hover:opacity-80">
-                <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs">KZ</span>
-                <span class="text-sm font-semibold tracking-widest">Veri&#8209;Trust</span>
-            </a>
-            <div class="flex items-center gap-4">
-                <span class="inline-flex items-center gap-1.5 rounded-full border <?= $roleColor ?> px-2.5 py-0.5 text-[10px] font-semibold capitalize">
-                    <?= $roleIcon ?> <?= htmlspecialchars($role, ENT_QUOTES, 'UTF-8') ?>
-                </span>
-                <?php if (!empty($_SESSION['private_key'])): ?>
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-800 bg-emerald-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
-                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>PQC Signing ON
-                    </span>
-                <?php else: ?>
-                    <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800 px-2.5 py-0.5 text-[10px] font-semibold text-slate-500">
-                        <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>Verify only
-                    </span>
-                <?php endif; ?>
-                <div class="flex items-center gap-3 border-l border-slate-800 pl-4">
-                    <span class="text-xs text-slate-500"><?= htmlspecialchars($_SESSION['username'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
-                    <a href="<?= $base ?>/logout" class="text-xs text-red-400 hover:text-red-300">Logout</a>
-                </div>
-            </div>
+<div class="top-stripe"></div>
+
+<nav class="site-nav">
+    <a href="<?= $base ?>/" class="nav-brand">
+        <div class="logo-mark">KZ</div>
+        <span class="brand-name">KAZ-SIGN</span>
+    </a>
+
+    <a href="<?= $base ?>/" class="nav-link active">Dashboard</a>
+    <?php if ($role === 'issuer'): ?>
+    <a href="<?= $base ?>/documents/upload" class="nav-link">Documents</a>
+    <?php endif; ?>
+    <a href="<?= $base ?>/trust-registry" class="nav-link" target="_blank">Trust Registry</a>
+
+    <div class="nav-right">
+        <span class="role-pill <?= $role ?>"><?= ucfirst($role) ?></span>
+        <?php if ($hasKey): ?>
+            <span class="pqc-pill">PQC Signing On</span>
+        <?php else: ?>
+            <span class="pqc-pill off">Verify Only</span>
+        <?php endif; ?>
+        <div class="nav-user">
+            <span class="nav-username"><?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?></span>
+            <a href="<?= $base ?>/logout" class="nav-logout">Logout</a>
         </div>
     </div>
 </nav>
 
-<main class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+<div class="page-wrap">
 
     <?php if (!empty($flash)): ?>
-        <div class="rounded-lg border px-4 py-3 text-sm
-            <?= $flash['type'] === 'success' ? 'border-emerald-700 bg-emerald-900/30 text-emerald-300' : 'border-red-800 bg-red-950/50 text-red-300' ?>">
+        <div class="flash <?= htmlspecialchars($flash['type'], ENT_QUOTES, 'UTF-8') ?>">
             <?= $flash['message'] ?>
         </div>
     <?php endif; ?>
 
-    <div class="flex items-center gap-3">
-        <span class="inline-flex items-center gap-2 rounded-full border <?= $roleColor ?> px-3 py-1 text-xs font-semibold capitalize">
-            <?= $roleIcon ?> <?= htmlspecialchars($role, ENT_QUOTES, 'UTF-8') ?> Dashboard
-        </span>
+    <div class="page-header">
+        <h1 class="page-title">
+            <?php if ($role === 'issuer'): ?>Issuer <span>Dashboard</span>
+            <?php elseif ($role === 'verifier'): ?>Verifier <span>Dashboard</span>
+            <?php else: ?>My <span>Credentials</span>
+            <?php endif; ?>
+        </h1>
+        <span style="font-size:12px;color:var(--ink-light);">Signed in as <strong style="color:var(--ink);"><?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?></strong></span>
     </div>
 
-<?php if ($role === 'issuer'): ?>
-<!-- ═══════════════════════ ISSUER ═══════════════════════════════════════════ -->
-
-    <!-- DID + PQC Identity Card -->
-    <div class="rounded-xl border border-blue-800 bg-blue-900/10 p-5 space-y-3">
-        <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold text-blue-300 uppercase tracking-widest">Issuer Identity</h2>
-            <div class="flex gap-2">
-                <span class="rounded-full border border-purple-700 bg-purple-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-purple-300">PQC</span>
-                <span class="rounded-full border border-blue-700 bg-blue-900/30 px-2.5 py-0.5 text-[10px] font-semibold text-blue-300">VeriTrust v1</span>
-            </div>
-        </div>
-        <div class="space-y-1">
-            <p class="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">DID</p>
-            <div class="flex items-center gap-2">
-                <code class="flex-1 rounded-lg bg-slate-800 px-3 py-2 text-[10px] font-mono text-emerald-300 break-all"><?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?></code>
-                <button onclick="copyText('<?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?>', this)"
-                        class="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[9px] text-slate-300 hover:text-emerald-300">Copy</button>
-            </div>
-        </div>
+    <!-- DID Identity Bar -->
+    <div class="identity-bar">
+        <span class="identity-label">Your DID</span>
+        <span class="identity-did" id="user-did"><?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?></span>
+        <button class="btn-copy-did" onclick="copyText(document.getElementById('user-did').textContent, this)">Copy</button>
     </div>
 
-    <!-- Issue form -->
-    <div class="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-5">
-        <h2 class="text-sm font-semibold text-slate-100">Issue a Verifiable Credential</h2>
+    <?php if ($role === 'issuer'): ?>
+    <!-- ══════════════════ ISSUER VIEW ══════════════════════════════════════ -->
 
-        <?php if (empty($holders)): ?>
-            <div class="rounded-lg border border-yellow-800 bg-yellow-900/20 px-4 py-3 text-xs text-yellow-300">
-                No holders registered yet.
-            </div>
-        <?php else: ?>
-        <form action="<?= $base ?>/credentials/issue" method="POST" class="space-y-5" id="issue-form">
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
-            <input type="hidden" name="subject_data" id="subject_data_hidden" />
+    <!-- Issue credential form -->
+    <div class="card" style="margin-bottom:28px;">
+        <div class="card-head">
+            <span class="card-head-title">Issue Verifiable Credential</span>
+            <?php if (!$hasKey): ?>
+                <span style="font-size:11px;color:var(--red);font-weight:500;">
+                    Private key required — re-login with your key to sign
+                </span>
+            <?php endif; ?>
+        </div>
+        <div class="card-body">
+            <?php if (empty($holders)): ?>
+                <p style="font-size:13px;color:var(--ink-light);">No holders registered yet. Ask recipients to create Holder accounts.</p>
+            <?php else: ?>
+            <form action="<?= $base ?>/credentials/issue" method="POST" id="issue-form">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
+                <input type="hidden" name="subject_data" id="subject_data_hidden" />
 
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Holder</label>
-                    <select name="holder_id" required
-                            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none">
-                        <option value="">— select holder —</option>
-                        <?php foreach ($holders as $h): ?>
-                            <option value="<?= (int)$h['id'] ?>">
-                                <?= htmlspecialchars($h['full_name'] ?? $h['username'] ?? 'Unknown', ENT_QUOTES, 'UTF-8') ?>
-                                (<?= htmlspecialchars($h['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="field-row" style="margin-bottom:14px;">
+                    <div class="field">
+                        <label class="field-label">Recipient (Holder)</label>
+                        <select name="holder_id" required>
+                            <option value="">— Select holder —</option>
+                            <?php foreach ($holders as $h): ?>
+                                <option value="<?= (int)$h['id'] ?>">
+                                    <?= htmlspecialchars($h['full_name'] ?? $h['username'] ?? 'Unknown', ENT_QUOTES, 'UTF-8') ?>
+                                    (<?= htmlspecialchars($h['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Credential Type</label>
+                        <select name="credential_type" id="credential_type" onchange="switchFields(this.value)">
+                            <option value="AcademicCredential">Academic Credential</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="space-y-1.5">
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Credential Type</label>
-                    <select name="credential_type" id="credential_type" onchange="switchFields(this.value)"
-                            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none">
-                        <option value="AcademicCredential">Academic Credential</option>
-                    </select>
-                </div>
-            </div>
 
-            <!-- Auto-generated Certificate Serial notice -->
-            <div class="rounded-lg border border-emerald-800/60 bg-emerald-900/10 px-4 py-3 flex items-start gap-3">
-                <span class="text-emerald-400 text-sm mt-0.5"></span>
-                <div class="space-y-0.5">
-                    <p class="text-[11px] font-semibold text-emerald-300">Certificate Serial No. — Auto-generated</p>
-                    <p class="text-[10px] text-slate-500">
-                        The system automatically assigns a unique numeric serial number
-                        (e.g. <code class="text-emerald-400">88903405</code>) when this credential is issued.
-                        Holders &amp; verifiers use this serial to look up the credential.
+                <div class="auto-serial-notice">
+                    <span style="font-size:16px;flex-shrink:0;">🔢</span>
+                    <p>
+                        <strong>Certificate Serial No. is auto-generated by the system</strong> at issuance time
+                        (e.g. <code style="font-family:monospace;color:var(--orange-dark);">88903405</code>).
+                        Holders and verifiers use this serial to look up credentials.
                     </p>
                 </div>
-            </div>
 
-            <?php foreach ($credentialFields as $credType => $fields): ?>
-            <div id="fields-<?= $credType ?>" class="space-y-4 <?= $credType !== 'AcademicCredential' ? 'hidden' : '' ?>">
-                <p class="text-[10px] text-slate-500 uppercase tracking-widest font-semibold border-b border-slate-800 pb-2">Subject Fields</p>
-                <?php foreach (array_chunk($fields, 2) as $pair): ?>
-                <div class="grid grid-cols-<?= count($pair) === 2 ? '2' : '1' ?> gap-4">
-                    <?php foreach ($pair as $f): ?>
-                    <div class="space-y-1.5">
-                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider"><?= htmlspecialchars($f['label'], ENT_QUOTES, 'UTF-8') ?></label>
-                        <?php if ($f['type'] === 'textarea'): ?>
-                        <textarea data-field-key="<?= $f['key'] ?>" data-cred-type="<?= $credType ?>"
-                                  placeholder="<?= htmlspecialchars($f['placeholder'], ENT_QUOTES, 'UTF-8') ?>" rows="3"
-                                  class="subject-field w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 resize-none focus:border-emerald-500 focus:outline-none"></textarea>
-                        <?php else: ?>
-                        <input type="text" data-field-key="<?= $f['key'] ?>" data-cred-type="<?= $credType ?>"
-                               placeholder="<?= htmlspecialchars($f['placeholder'], ENT_QUOTES, 'UTF-8') ?>"
-                               class="subject-field w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:border-emerald-500 focus:outline-none" />
-                        <?php endif; ?>
+                <?php foreach ($credentialFields as $credType => $fields): ?>
+                <div id="fields-<?= $credType ?>" class="<?= $credType !== 'AcademicCredential' ? 'hidden' : '' ?>">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--ink-light);font-weight:600;margin-bottom:12px;padding-top:4px;border-top:1px solid var(--rule);padding-top:12px;">
+                        Credential Subject Fields
                     </div>
+                    <div class="field-row">
+                    <?php foreach ($fields as $i => $f):
+                        if ($i > 0 && $i % 2 === 0) echo '</div><div class="field-row">';
+                    ?>
+                        <div class="field">
+                            <label class="field-label"><?= htmlspecialchars($f['label'], ENT_QUOTES, 'UTF-8') ?></label>
+                            <?php if (($f['type'] ?? 'text') === 'textarea'): ?>
+                                <textarea data-field-key="<?= $f['key'] ?>" data-cred-type="<?= $credType ?>"
+                                          placeholder="<?= htmlspecialchars($f['placeholder'], ENT_QUOTES, 'UTF-8') ?>"
+                                          class="subject-field" rows="3"></textarea>
+                            <?php else: ?>
+                                <input type="text" data-field-key="<?= $f['key'] ?>" data-cred-type="<?= $credType ?>"
+                                       placeholder="<?= htmlspecialchars($f['placeholder'], ENT_QUOTES, 'UTF-8') ?>"
+                                       class="subject-field" />
+                            <?php endif; ?>
+                        </div>
                     <?php endforeach; ?>
+                    </div>
                 </div>
                 <?php endforeach; ?>
-            </div>
-            <?php endforeach; ?>
 
-            <button type="submit" <?= empty($_SESSION['private_key']) ? 'disabled' : '' ?>
-                    class="rounded-lg bg-emerald-500 px-5 py-2 text-xs font-bold uppercase tracking-widest text-slate-950 hover:bg-emerald-400 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                Issue &amp; Sign Credential
-            </button>
-        </form>
-        <?php endif; ?>
+                <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);">
+                    <button type="submit" class="btn-primary" <?= !$hasKey ? 'disabled' : '' ?>>
+                        Issue &amp; Sign Credential
+                    </button>
+                    <?php if (!$hasKey): ?>
+                        <span style="font-size:12px;color:var(--red);margin-left:14px;">Private key not loaded</span>
+                    <?php endif; ?>
+                </div>
+            </form>
+            <?php endif; ?>
+        </div>
     </div>
 
     <!-- Issued credentials table -->
-    <div class="space-y-3">
-        <h2 class="text-sm font-semibold text-slate-100">
-            Issued Credentials
-            <span class="ml-2 rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500"><?= count($credentials) ?></span>
-        </h2>
-        <?php if (empty($credentials)): ?>
-            <div class="rounded-xl border border-slate-800 bg-slate-900 px-6 py-12 text-center">
-                <p class="text-sm text-slate-500">No credentials issued yet.</p>
-            </div>
-        <?php else: ?>
-            <div class="rounded-xl border border-slate-800 overflow-hidden">
-                <table class="w-full text-xs">
-                    <thead class="border-b border-slate-700 bg-slate-800">
-                        <tr>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">#</th>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">Holder</th>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">Type</th>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">Cert. Serial</th>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">Status</th>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">Issued</th>
-                            <th class="px-3 py-3 text-left text-slate-400 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800 bg-slate-900">
-                    <?php foreach ($credentials as $c):
-                        $jld        = json_decode($c['jsonld'] ?? '{}', true) ?: [];
-                        $type       = implode(', ', array_filter($jld['type'] ?? [], fn($t) => $t !== 'VerifiableCredential'));
-                        $holderName = $c['holder_name'] ?? 'Unknown';
-                        $s          = $c['status'] ?? 'issued';
-                        $credId     = $c['credential_id'] ?? '';
-                        $subject    = $jld['credentialSubject'] ?? [];
-                        $certSerial = $subject['certificateSerial'] ?? '—';
-                    ?>
-                        <tr class="hover:bg-slate-800/50">
-                            <td class="px-3 py-3 text-slate-500"><?= (int)$c['id'] ?></td>
-                            <td class="px-3 py-3 text-slate-300"><?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?></td>
-                            <td class="px-3 py-3 text-slate-400"><?= htmlspecialchars($type ?: '—', ENT_QUOTES, 'UTF-8') ?></td>
-                            <td class="px-3 py-3">
-                                <code class="text-[10px] text-emerald-400 font-mono"><?= htmlspecialchars($certSerial, ENT_QUOTES, 'UTF-8') ?></code>
-                            </td>
-                            <td class="px-3 py-3">
-                                <span class="rounded-full border px-2.5 py-0.5 text-[10px] font-semibold
-                                    <?= $s === 'verified' ? 'border-emerald-700 bg-emerald-900/30 text-emerald-400'
-                                      : ($s === 'rejected'  ? 'border-red-800 bg-red-950/40 text-red-400'
-                                      : ($s === 'revoked'   ? 'border-orange-700 bg-orange-900/30 text-orange-400'
-                                      : 'border-blue-700 bg-blue-900/30 text-blue-400')) ?>">
-                                    <?= ucfirst($s) ?>
-                                </span>
-                            </td>
-                            <td class="px-3 py-3 text-slate-500"><?= htmlspecialchars(substr($c['issued_at'] ?? '', 0, 10), ENT_QUOTES, 'UTF-8') ?></td>
-                            <td class="px-3 py-3 space-y-1.5">
-                                <!-- View JSON-LD -->
-                                <button onclick="toggleJsonLd(<?= (int)$c['id'] ?>, this)"
-                                        class="block text-[10px] text-emerald-400 hover:underline">View JSON-LD</button>
-
-                                <!-- Generate PDF + QR -->
-                                <button onclick='generateCredentialPDF(<?= htmlspecialchars(json_encode([
-                                    'id'          => $c['id'],
-                                    'credId'      => $credId,
-                                    'certSerial'  => $certSerial,
-                                    'holderName'  => $holderName,
-                                    'type'        => $type,
-                                    'issuedAt'    => substr($c['issued_at'] ?? '', 0, 10),
-                                    'issuerName'  => $jld['issuer']['name'] ?? '',
-                                    'issuerDid'   => $jld['issuer']['id'] ?? '',
-                                    'holderDid'   => $subject['id'] ?? '',
-                                    'subject'     => $subject,
-                                    'status'      => $s,
-                                ]), ENT_QUOTES, 'UTF-8') ?>)'
-                                        class="block text-[10px] text-blue-400 hover:underline">Download PDF</button>
-
-                                <!-- Revoke -->
-                                <?php if ($s !== 'revoked'): ?>
-                                <form method="POST" action="<?= $base ?>/credentials/revoke" class="inline"
-                                      onsubmit="return confirm('Revoke this credential? This cannot be undone.')">
-                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
-                                    <input type="hidden" name="credential_db_id" value="<?= (int)$c['id'] ?>" />
-                                    <button type="submit" class="block text-[10px] text-red-400 hover:underline">Revoke</button>
-                                </form>
-                                <?php else: ?>
-                                    <span class="block text-[10px] text-orange-600">Revoked</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <!-- JSON-LD inline row -->
-                        <tr id="jsonld-<?= (int)$c['id'] ?>" class="hidden">
-                            <td colspan="7" class="px-4 py-4 bg-slate-800/60">
-                                <pre class="text-[9px] text-emerald-300 whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto"><?= htmlspecialchars(
-                                    json_encode($jld, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-                                    ENT_QUOTES, 'UTF-8'
-                                ) ?></pre>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+    <div class="section-head">
+        <span class="section-title">Issued Credentials</span>
+        <span class="count-badge"><?= count($credentials) ?></span>
     </div>
 
-<?php elseif ($role === 'holder'): ?>
-<!-- ═══════════════════════ HOLDER ═══════════════════════════════════════════ -->
-
-    <!-- DID -->
-    <div class="rounded-xl border border-emerald-800/50 bg-emerald-900/10 p-4 space-y-2">
-        <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Your DID</p>
-        <div class="flex items-center gap-2">
-            <code class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-xs font-mono text-emerald-300 break-all"><?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?></code>
-            <button onclick="copyText('<?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?>', this)"
-                    class="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[9px] text-slate-300 hover:text-emerald-300">Copy</button>
-        </div>
-    </div>
-
-    <div class="space-y-4">
-        <h2 class="text-sm font-semibold text-slate-100">
-            My Credentials
-            <span class="ml-2 rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500"><?= count($credentials) ?></span>
-        </h2>
-
-        <?php if (empty($credentials)): ?>
-            <div class="rounded-xl border border-slate-800 bg-slate-900 px-6 py-16 text-center space-y-2">
-                <p class="text-sm text-slate-500">No credentials issued to you yet.</p>
-            </div>
-        <?php else: ?>
-            <div class="grid gap-4">
+    <?php if (empty($credentials)): ?>
+        <div class="empty-state"><p>No credentials issued yet.</p></div>
+    <?php else: ?>
+    <div class="card" style="overflow:hidden;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Holder</th>
+                    <th>Credential Type</th>
+                    <th>Cert. Serial No.</th>
+                    <th>Status</th>
+                    <th>Issued</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
             <?php foreach ($credentials as $c):
                 $jld        = json_decode($c['jsonld'] ?? '{}', true) ?: [];
-                $subject    = $jld['credentialSubject'] ?? [];
-                $types      = array_filter($jld['type'] ?? [], fn($t) => $t !== 'VerifiableCredential');
-                $type       = implode(', ', $types);
+                $type       = implode(', ', array_filter($jld['type'] ?? [], fn($t) => $t !== 'VerifiableCredential'));
+                $holderName = $c['holder_name'] ?? 'Unknown';
                 $s          = $c['status'] ?? 'issued';
-                $issuerName = $c['issuer_name'] ?? 'Unknown Issuer';
-                $issuerDid  = $jld['issuer']['id'] ?? '—';
                 $credId     = $c['credential_id'] ?? '';
+                $subject    = $jld['credentialSubject'] ?? [];
                 $certSerial = $subject['certificateSerial'] ?? '—';
             ?>
-                <div class="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-                    <!-- Header -->
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-emerald-400"><?= htmlspecialchars($type ?: 'VerifiableCredential', ENT_QUOTES, 'UTF-8') ?></p>
-                            <p class="text-[10px] text-slate-500 mt-0.5">
-                                Issued by <span class="text-slate-300"><?= htmlspecialchars($issuerName, ENT_QUOTES, 'UTF-8') ?></span>
-                                · <?= htmlspecialchars(substr($c['issued_at'] ?? '', 0, 10), ENT_QUOTES, 'UTF-8') ?>
-                            </p>
-                            <p class="text-[10px] text-slate-600 font-mono mt-0.5 truncate max-w-xs">Issuer DID: <?= htmlspecialchars($issuerDid, ENT_QUOTES, 'UTF-8') ?></p>
-                        </div>
-                        <span class="rounded-full border px-2.5 py-0.5 text-[10px] font-semibold
-                            <?= $s === 'verified' ? 'border-emerald-700 bg-emerald-900/30 text-emerald-400'
-                              : ($s === 'rejected'  ? 'border-red-800 bg-red-950/40 text-red-400'
-                              : ($s === 'revoked'   ? 'border-orange-700 bg-orange-900/30 text-orange-400'
-                              : 'border-blue-700 bg-blue-900/30 text-blue-400')) ?>">
-                            <?= $s === 'revoked' ? 'Revoked' : ucfirst($s) ?>
-                        </span>
+            <tr>
+                <td style="color:var(--ink-light);font-size:12px;"><?= (int)$c['id'] ?></td>
+                <td><?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?></td>
+                <td style="color:var(--ink-mid);font-size:12px;"><?= htmlspecialchars($type ?: '—', ENT_QUOTES, 'UTF-8') ?></td>
+                <td><span class="cert-serial"><?= htmlspecialchars($certSerial, ENT_QUOTES, 'UTF-8') ?></span></td>
+                <td><span class="status-badge status-<?= $s ?>"><?= ucfirst($s) ?></span></td>
+                <td style="color:var(--ink-mid);font-size:12px;"><?= htmlspecialchars(substr($c['issued_at'] ?? '', 0, 10), ENT_QUOTES, 'UTF-8') ?></td>
+                <td>
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+                        <button class="action-link" onclick="toggleJsonLd(<?= (int)$c['id'] ?>, this)">View JSON-LD</button>
+                        <button class="action-link muted" onclick='generateCredentialPDF(<?= htmlspecialchars(json_encode([
+                            'id' => $c['id'], 'credId' => $credId, 'certSerial' => $certSerial,
+                            'holderName' => $holderName, 'type' => $type,
+                            'issuedAt' => substr($c['issued_at'] ?? '', 0, 10),
+                            'issuerName' => $jld['issuer']['name'] ?? '',
+                            'issuerDid' => $jld['issuer']['id'] ?? '',
+                            'holderDid' => $subject['id'] ?? '',
+                            'subject' => $subject, 'status' => $s,
+                        ]), ENT_QUOTES, 'UTF-8') ?>)'>PDF</button>
+                        <?php if ($s !== 'revoked'): ?>
+                        <form method="POST" action="<?= $base ?>/credentials/revoke" style="display:inline"
+                              onsubmit="return confirm('Revoke this credential? This cannot be undone.')">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
+                            <input type="hidden" name="credential_db_id" value="<?= (int)$c['id'] ?>" />
+                            <button type="submit" class="action-link danger">Revoke</button>
+                        </form>
+                        <?php else: ?>
+                            <span style="font-size:11px;color:var(--ink-light);text-transform:uppercase;">Revoked</span>
+                        <?php endif; ?>
                     </div>
-
-                    <!-- Certificate Serial highlight -->
-                    <div class="rounded-lg border border-emerald-800/50 bg-emerald-900/10 px-4 py-2.5 flex items-center justify-between gap-4">
-                        <div>
-                            <p class="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Certificate Serial No.</p>
-                            <code class="text-sm font-mono text-emerald-300"><?= htmlspecialchars($certSerial, ENT_QUOTES, 'UTF-8') ?></code>
-                        </div>
-                        <button onclick="copyText('<?= htmlspecialchars($certSerial, ENT_QUOTES, 'UTF-8') ?>', this)"
-                                class="shrink-0 rounded border border-slate-700 bg-slate-800 px-3 py-1 text-[10px] text-slate-300 hover:text-emerald-300">Copy Serial</button>
+                </td>
+            </tr>
+            <!-- JSON-LD viewer row -->
+            <tr id="jsonld-<?= (int)$c['id'] ?>" style="display:none;">
+                <td colspan="7" style="padding:0;">
+                    <div class="jsonld-viewer" style="display:block;">
+                        <pre><?= htmlspecialchars(json_encode($jld, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?></pre>
                     </div>
-
-                    <!-- Subject fields -->
-                    <div class="rounded-lg bg-slate-800 p-4 space-y-1.5">
-                        <?php foreach ($subject as $key => $val): if ($key === 'id') continue; ?>
-                            <div class="flex gap-4 text-xs">
-                                <span class="text-slate-500 w-36 shrink-0"><?= htmlspecialchars((string)$key, ENT_QUOTES, 'UTF-8') ?></span>
-                                <span class="text-slate-300"><?= htmlspecialchars(is_array($val) ? json_encode($val) : (string)$val, ENT_QUOTES, 'UTF-8') ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="flex items-center justify-end gap-3">
-                        <button onclick="toggleJsonLd(<?= (int)$c['id'] ?>, this)"
-                                class="text-[10px] text-emerald-400 hover:underline">View JSON-LD</button>
-                        <!-- Download PDF -->
-                        <button onclick='generateCredentialPDF(<?= htmlspecialchars(json_encode([
-                            'id'         => $c['id'],
-                            'credId'     => $credId,
-                            'certSerial' => $certSerial,
-                            'holderName' => $subject['name'] ?? '',
-                            'type'       => $type,
-                            'issuedAt'   => substr($c['issued_at'] ?? '', 0, 10),
-                            'issuerName' => $issuerName,
-                            'issuerDid'  => $issuerDid,
-                            'holderDid'  => $subject['id'] ?? '',
-                            'subject'    => $subject,
-                            'status'     => $s,
-                        ]), ENT_QUOTES, 'UTF-8') ?>)'
-                                class="text-[10px] text-blue-400 hover:underline">Download PDF</button>
-                    </div>
-
-                    <!-- Inline JSON-LD -->
-                    <div id="jsonld-<?= (int)$c['id'] ?>" class="hidden">
-                        <pre class="rounded-lg bg-slate-800 p-4 text-[9px] text-emerald-300 whitespace-pre-wrap break-all leading-relaxed overflow-x-auto max-h-64 overflow-y-auto"><?= htmlspecialchars(
-                            json_encode($jld, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-                            ENT_QUOTES, 'UTF-8'
-                        ) ?></pre>
-                    </div>
-                </div>
+                </td>
+            </tr>
             <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </div>
-
-<?php elseif ($role === 'verifier'): ?>
-<!-- ═══════════════════════ VERIFIER ═════════════════════════════════════════ -->
-
-    <!-- Verifier DID -->
-    <div class="rounded-xl border border-purple-800/50 bg-purple-900/10 p-4 space-y-2">
-        <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Your DID</p>
-        <div class="flex items-center gap-2">
-            <code class="flex-1 rounded-lg bg-slate-800 px-4 py-2 text-xs font-mono text-purple-300 break-all"><?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?></code>
-            <button onclick="copyText('<?= htmlspecialchars($did, ENT_QUOTES, 'UTF-8') ?>', this)"
-                    class="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[9px] text-slate-300 hover:text-purple-300">Copy</button>
-        </div>
-    </div>
-
-    <!-- Verify by Certificate Serial Number -->
-    <div class="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-        <div>
-            <h2 class="text-sm font-semibold text-slate-100">Verify a Credential</h2>
-            <p class="text-xs text-slate-500 mt-1">
-                Enter the <span class="text-purple-300 font-semibold">Certificate Serial Number</span>
-                printed on the holder's certificate (an 8-digit number).
-            </p>
-        </div>
-        <form action="<?= $base ?>/credentials/verify" method="POST" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
-            <div class="space-y-1.5">
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Certificate Serial No.</label>
-                <input name="certificate_serial" type="text" required
-                       inputmode="numeric" pattern="[0-9]*"
-                       placeholder="88903405"
-                       autocomplete="off"
-                       class="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5
-                              text-sm font-mono text-slate-100 tracking-wider
-                              focus:border-purple-500 focus:outline-none" />
-            </div>
-            <button type="submit"
-                    class="w-full rounded-lg bg-purple-600 px-5 py-2.5 text-xs font-bold uppercase tracking-widest
-                           text-white hover:bg-purple-500 active:scale-95 transition-all">
-                Verify Credential
-            </button>
-        </form>
-    </div>
-
-    <!-- Verification result -->
-    <?php if (!empty($result)):
-        $cred    = $result['credential'] ?? [];
-        $jld     = $result['jsonld']     ?? [];
-        $subj    = $jld['credentialSubject'] ?? [];
-        $types   = array_filter($jld['type'] ?? [], fn($t) => $t !== 'VerifiableCredential');
-        $revoked = $result['revoked'] ?? false;
-    ?>
-    <div class="rounded-xl border <?= $revoked ? 'border-orange-700' : (($result['verified'] ?? false) ? 'border-emerald-700' : 'border-red-800') ?>
-                bg-slate-900 p-6 space-y-5">
-
-        <?php if ($revoked): ?>
-        <div class="rounded-lg border border-orange-700 bg-orange-900/20 px-4 py-3 text-sm font-semibold text-orange-300">
-            REVOKED — This credential was cancelled by the issuer and is no longer valid.
-        </div>
-        <?php endif; ?>
-
-        <h2 class="text-sm font-semibold <?= $revoked ? 'text-orange-300' : (($result['verified'] ?? false) ? 'text-emerald-300' : 'text-red-300') ?>">
-            <?= $revoked ? 'Credential Revoked' : (($result['verified'] ?? false) ? 'Credential Verified' : 'Verification Failed') ?>
-        </h2>
-
-        <?php if (!$revoked): ?>
-        <div class="space-y-2">
-            <div class="flex items-center justify-between rounded-lg bg-slate-800 px-4 py-3">
-                <span class="text-xs text-slate-400">SHA-256 Hash Integrity</span>
-                <span class="text-[10px] font-bold rounded-full px-3 py-0.5 border
-                    <?= ($result['hash_intact'] ?? false) ? 'border-emerald-700 bg-emerald-900/30 text-emerald-400' : 'border-red-800 bg-red-950/40 text-red-400' ?>">
-                    <?= ($result['hash_intact'] ?? false) ? 'Intact' : 'MODIFIED' ?>
-                </span>
-            </div>
-            <div class="flex items-center justify-between rounded-lg bg-slate-800 px-4 py-3">
-                <span class="text-xs text-slate-400">KAZ-SIGN PQC Signature</span>
-                <span class="text-[10px] font-bold rounded-full px-3 py-0.5 border
-                    <?= ($result['signature_valid'] ?? false) ? 'border-emerald-700 bg-emerald-900/30 text-emerald-400' : 'border-red-800 bg-red-950/40 text-red-400' ?>">
-                    <?= ($result['signature_valid'] ?? false) ? 'Valid' : 'Invalid' ?>
-                </span>
-            </div>
-        </div>
-        <?php endif; ?>
-
-        <div class="rounded-lg bg-slate-800 p-4 space-y-2">
-            <p class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-2">Credential Details</p>
-            <div class="flex gap-4 text-xs"><span class="text-slate-500 w-36 shrink-0">Cert. Serial No.</span><span class="text-emerald-300 font-mono"><?= htmlspecialchars($subj['certificateSerial'] ?? '—', ENT_QUOTES, 'UTF-8') ?></span></div>
-            <div class="flex gap-4 text-xs"><span class="text-slate-500 w-36 shrink-0">Type</span><span class="text-slate-300"><?= htmlspecialchars(implode(', ', $types) ?: '—', ENT_QUOTES, 'UTF-8') ?></span></div>
-            <div class="flex gap-4 text-xs"><span class="text-slate-500 w-36 shrink-0">Issuer DID</span><span class="text-blue-300 font-mono break-all text-[9px]"><?= htmlspecialchars($jld['issuer']['id'] ?? '—', ENT_QUOTES, 'UTF-8') ?></span></div>
-            <div class="flex gap-4 text-xs"><span class="text-slate-500 w-36 shrink-0">Issued by</span><span class="text-slate-300"><?= htmlspecialchars($jld['issuer']['name'] ?? '—', ENT_QUOTES, 'UTF-8') ?></span></div>
-            <div class="flex gap-4 text-xs"><span class="text-slate-500 w-36 shrink-0">Issued on</span><span class="text-slate-300"><?= htmlspecialchars(substr($cred['issued_at'] ?? '', 0, 10), ENT_QUOTES, 'UTF-8') ?></span></div>
-            <?php foreach ($subj as $key => $val): if ($key === 'id' || $key === 'certificateSerial') continue; ?>
-            <div class="flex gap-4 text-xs">
-                <span class="text-slate-500 w-36 shrink-0"><?= htmlspecialchars((string)$key, ENT_QUOTES, 'UTF-8') ?></span>
-                <span class="text-slate-300"><?= htmlspecialchars(is_array($val) ? json_encode($val) : (string)$val, ENT_QUOTES, 'UTF-8') ?></span>
-            </div>
-            <?php endforeach; ?>
-        </div>
-
-        <!-- Full JSON-LD -->
-        <div>
-            <button onclick="toggleJsonLd('verify-result', this)" class="text-xs text-slate-500 hover:text-slate-300">▶ Show full JSON-LD</button>
-            <div id="jsonld-verify-result" class="hidden mt-3">
-                <pre class="rounded-lg bg-slate-800 p-4 text-[9px] text-emerald-300 whitespace-pre-wrap break-all leading-relaxed overflow-x-auto max-h-64 overflow-y-auto"><?= htmlspecialchars(
-                    json_encode($jld, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-                    ENT_QUOTES, 'UTF-8'
-                ) ?></pre>
-            </div>
-        </div>
+            </tbody>
+        </table>
     </div>
     <?php endif; ?>
 
-<?php endif; ?>
-</main>
+    <?php elseif ($role === 'holder'): ?>
+    <!-- ══════════════════ HOLDER VIEW ══════════════════════════════════════ -->
 
-<!-- Hidden QR container (off-screen) -->
-<div id="qr-container" style="position:absolute;left:-9999px;top:0;width:200px;height:200px;background:#fff;padding:10px;"></div>
+    <div class="section-head">
+        <span class="section-title">My Credentials</span>
+        <span class="count-badge"><?= count($credentials) ?></span>
+    </div>
+
+    <?php if (empty($credentials)): ?>
+        <div class="empty-state">
+            <p>No credentials issued to you yet. Your issuer will add credentials to your account.</p>
+        </div>
+    <?php else: ?>
+        <?php foreach ($credentials as $c):
+            $jld        = json_decode($c['jsonld'] ?? '{}', true) ?: [];
+            $subject    = $jld['credentialSubject'] ?? [];
+            $types      = array_filter($jld['type'] ?? [], fn($t) => $t !== 'VerifiableCredential');
+            $type       = implode(', ', $types);
+            $s          = $c['status'] ?? 'issued';
+            $issuerName = $c['issuer_name'] ?? 'Unknown';
+            $issuerDid  = $jld['issuer']['id'] ?? '—';
+            $credId     = $c['credential_id'] ?? '';
+            $certSerial = $subject['certificateSerial'] ?? '—';
+        ?>
+        <div class="cred-card">
+            <div class="cred-card-head">
+                <div>
+                    <div class="cred-type"><?= htmlspecialchars($type ?: 'Verifiable Credential', ENT_QUOTES, 'UTF-8') ?></div>
+                    <div class="cred-meta">
+                        Issued by <strong style="color:var(--ink-mid);"><?= htmlspecialchars($issuerName, ENT_QUOTES, 'UTF-8') ?></strong>
+                        &nbsp;&middot;&nbsp;
+                        <?= htmlspecialchars(substr($c['issued_at'] ?? '', 0, 10), ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                </div>
+                <span class="status-badge status-<?= $s ?>"><?= $s === 'revoked' ? 'Revoked' : ucfirst($s) ?></span>
+            </div>
+
+            <div class="cred-serial-bar">
+                <div>
+                    <div class="serial-label">Certificate Serial Number</div>
+                    <div class="serial-value"><?= htmlspecialchars($certSerial, ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+                <button class="btn-copy-did" onclick="copyText('<?= htmlspecialchars($certSerial, ENT_QUOTES, 'UTF-8') ?>', this)" style="font-size:11px;">Copy Serial</button>
+            </div>
+
+            <div class="cred-fields">
+                <?php foreach ($subject as $key => $val):
+                    if ($key === 'id' || $key === 'certificateSerial') continue;
+                    $label = ucfirst(preg_replace('/([A-Z])/', ' $1', $key));
+                ?>
+                <div class="field-row-display">
+                    <span class="frd-key"><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span>
+                    <span class="frd-val"><?= htmlspecialchars(is_array($val) ? json_encode($val) : (string)$val, ENT_QUOTES, 'UTF-8') ?></span>
+                </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="cred-actions">
+                <button class="action-link" onclick="toggleJsonLd(<?= (int)$c['id'] ?>, this)">View JSON-LD</button>
+                <button class="action-link muted" onclick='generateCredentialPDF(<?= htmlspecialchars(json_encode([
+                    'id' => $c['id'], 'credId' => $credId, 'certSerial' => $certSerial,
+                    'holderName' => $subject['name'] ?? '',
+                    'type' => $type, 'issuedAt' => substr($c['issued_at'] ?? '', 0, 10),
+                    'issuerName' => $issuerName, 'issuerDid' => $issuerDid,
+                    'holderDid' => $subject['id'] ?? '',
+                    'subject' => $subject, 'status' => $s,
+                ]), ENT_QUOTES, 'UTF-8') ?>)'>Download Certificate PDF</button>
+            </div>
+
+            <div id="jsonld-<?= (int)$c['id'] ?>" style="display:none;">
+                <div class="jsonld-viewer" style="display:block;">
+                    <pre><?= htmlspecialchars(json_encode($jld, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?></pre>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+
+    <?php elseif ($role === 'verifier'): ?>
+    <!-- ══════════════════ VERIFIER VIEW ════════════════════════════════════ -->
+
+    <div class="field-row" style="gap:32px;align-items:flex-start;">
+        <!-- Left: form -->
+        <div style="flex:0 0 380px;">
+            <div class="card">
+                <div class="card-head">
+                    <span class="card-head-title">Verify Credential</span>
+                </div>
+                <div class="card-body">
+                    <form action="<?= $base ?>/credentials/verify" method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
+
+                        <p style="font-size:13px;color:var(--ink-mid);margin-bottom:16px;line-height:1.6;">
+                            Enter the <strong style="color:var(--ink);">Certificate Serial Number</strong> printed
+                            on the holder's certificate (8-digit number).
+                        </p>
+
+                        <input type="text" name="certificate_serial" class="verify-input"
+                               required inputmode="numeric" pattern="[0-9]*"
+                               placeholder="00000000" autocomplete="off" />
+                        <p class="verify-hint">e.g. 88903405</p>
+
+                        <button type="submit" class="btn-verify">Verify Credential</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- How to use -->
+            <div style="padding:16px;background:var(--white);border:1px solid var(--rule);margin-top:12px;">
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--ink-light);font-weight:600;margin-bottom:8px;">How Verification Works</p>
+                <ol style="font-size:12px;color:var(--ink-mid);line-height:1.8;padding-left:16px;">
+                    <li>Obtain the 8-digit serial from the holder's certificate</li>
+                    <li>Enter it above and click Verify</li>
+                    <li>The system checks the SHA-256 hash integrity</li>
+                    <li>The system validates the KAZ-SIGN-128 PQC signature</li>
+                    <li>Results show authenticity &amp; current status</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Right: result -->
+        <?php if (!empty($result)):
+            $cred    = $result['credential'] ?? [];
+            $jld     = $result['jsonld'] ?? [];
+            $subj    = $jld['credentialSubject'] ?? [];
+            $types   = array_filter($jld['type'] ?? [], fn($t) => $t !== 'VerifiableCredential');
+            $revoked = $result['revoked'] ?? false;
+            $verified = $result['verified'] ?? false;
+            $headClass = $revoked ? 'revoked' : ($verified ? 'pass' : 'fail');
+        ?>
+        <div style="flex:1;">
+            <div class="verify-result">
+                <div class="verify-result-head <?= $headClass ?>">
+                    <span class="verify-result-icon"><?= $revoked ? '⛔' : ($verified ? '✓' : '✗') ?></span>
+                    <div class="verify-result-text">
+                        <h3><?= $revoked ? 'Credential Revoked' : ($verified ? 'Credential Valid' : 'Verification Failed') ?></h3>
+                        <p>
+                            <?= $revoked ? 'This credential was cancelled by the issuer.'
+                              : ($verified ? 'Signature and integrity checks passed.'
+                              : 'One or more verification checks failed.') ?>
+                        </p>
+                    </div>
+                </div>
+
+                <?php if (!$revoked): ?>
+                <div class="verify-checks">
+                    <div class="check-item">
+                        <span class="check-item-label">SHA-256 Hash Integrity</span>
+                        <span class="<?= ($result['hash_intact'] ?? false) ? 'check-pass' : 'check-fail' ?>">
+                            <?= ($result['hash_intact'] ?? false) ? 'Intact ✓' : 'Modified ✗' ?>
+                        </span>
+                    </div>
+                    <div class="check-item">
+                        <span class="check-item-label">KAZ-SIGN PQC Signature</span>
+                        <span class="<?= ($result['signature_valid'] ?? false) ? 'check-pass' : 'check-fail' ?>">
+                            <?= ($result['signature_valid'] ?? false) ? 'Valid ✓' : 'Invalid ✗' ?>
+                        </span>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <div class="verify-details">
+                    <p class="details-title">Credential Details</p>
+                    <?php
+                    $detailRows = [
+                        ['Cert. Serial No.', $subj['certificateSerial'] ?? '—'],
+                        ['Credential Type',  implode(', ', $types) ?: '—'],
+                        ['Issued By',        $jld['issuer']['name'] ?? '—'],
+                        ['Issuer DID',       $jld['issuer']['id'] ?? '—'],
+                        ['Issue Date',       substr($cred['issued_at'] ?? '', 0, 10)],
+                        ['Status',           ucfirst($cred['status'] ?? '—')],
+                    ];
+                    foreach ($subj as $k => $v) {
+                        if (in_array($k, ['id', 'certificateSerial'])) continue;
+                        $detailRows[] = [ucfirst(preg_replace('/([A-Z])/', ' $1', $k)), is_array($v) ? json_encode($v) : (string)$v];
+                    }
+                    foreach ($detailRows as [$k, $v]): ?>
+                    <div class="field-row-display">
+                        <span class="frd-key"><?= htmlspecialchars($k, ENT_QUOTES, 'UTF-8') ?></span>
+                        <span class="frd-val" style="font-size:<?= strlen($v) > 60 ? '10px' : '13px' ?>;font-family:<?= strlen($v) > 40 ? 'monospace' : 'inherit' ?>;">
+                            <?= htmlspecialchars($v, ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                    </div>
+                    <?php endforeach; ?>
+
+                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule);">
+                        <button class="action-link" onclick="toggleJsonLd('verify-result', this)">&#9654; View Full JSON-LD</button>
+                    </div>
+                    <div id="jsonld-verify-result" style="display:none;margin-top:10px;">
+                        <pre style="font-family:monospace;font-size:10px;color:#4A2600;line-height:1.7;white-space:pre-wrap;word-break:break-all;max-height:280px;overflow-y:auto;background:#F7F7F7;padding:14px;"><?= htmlspecialchars(json_encode($jld, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php else: ?>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:240px;">
+            <p style="font-size:14px;color:var(--ink-light);text-align:center;">
+                Enter a certificate serial number on the left to verify a credential.
+            </p>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <?php endif; ?>
+
+</div>
+
+<!-- Hidden QR container -->
+<div id="qr-gen"></div>
+
+<footer class="site-footer">
+    <span>KAZ-SIGN System &mdash; Post-Quantum Digital Credentials</span>
+    <span>KAZ-SIGN-128 Algorithm &nbsp;&middot;&nbsp; <?= date('Y') ?></span>
+</footer>
 
 <script>
-// ─── Field switching ──────────────────────────────────────────────────────────
 function switchFields(type) {
     document.querySelectorAll('[id^="fields-"]').forEach(el => el.classList.add('hidden'));
     const t = document.getElementById('fields-' + type);
@@ -524,7 +874,7 @@ function switchFields(type) {
 document.getElementById('issue-form')?.addEventListener('submit', function() {
     const credType  = document.getElementById('credential_type').value;
     const container = document.getElementById('fields-' + credType);
-    const obj       = {};
+    const obj = {};
     if (container) {
         container.querySelectorAll('.subject-field').forEach(el => {
             const key = el.dataset.fieldKey;
@@ -532,219 +882,186 @@ document.getElementById('issue-form')?.addEventListener('submit', function() {
             if (key && val !== '') obj[key] = val;
         });
     }
-    // certificateSerial is intentionally NOT set here —
-    // it is auto-generated server-side in CredentialController::issue().
     document.getElementById('subject_data_hidden').value = JSON.stringify(obj);
 });
 
-// ─── Toggle JSON-LD ───────────────────────────────────────────────────────────
 function toggleJsonLd(id, btn) {
     const el = document.getElementById('jsonld-' + id);
-    const hidden = el.classList.toggle('hidden');
-    if (btn) {
-        btn.textContent = hidden
-            ? btn.textContent.replace('Hide','View').replace('▼','▶')
-            : btn.textContent.replace('View','Hide').replace('▶','▼');
+    const hidden = el.style.display === 'none';
+    el.style.display = hidden ? 'block' : 'none';
+    if (btn) btn.textContent = btn.textContent
+        .replace('View','Hide').replace('▶','▼')
+        .replace('Hide JSON-LD', 'View JSON-LD')
+        .replace('▼', hidden ? '▼' : '▶');
+    if (btn && !btn.textContent.includes('JSON')) {
+        btn.textContent = hidden ? '▼ Hide Full JSON-LD' : '▶ View Full JSON-LD';
     }
 }
 
-// ─── Copy text ────────────────────────────────────────────────────────────────
 function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
         const orig = btn.textContent;
-        btn.textContent = 'Copied!';
+        btn.textContent = '✓ Copied';
         setTimeout(() => btn.textContent = orig, 2000);
     });
 }
 
-// ─── PDF Generation with QR Code ─────────────────────────────────────────────
 async function generateCredentialPDF(data) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageW = 210, margin = 18, colW = pageW - margin * 2;
+    let y = 0;
 
-    const pageW  = 210;
-    const margin = 20;
-    const colW   = pageW - margin * 2;
-    let y = 20;
+    /* Orange header stripe */
+    doc.setFillColor(232, 101, 10);
+    doc.rect(0, 0, pageW, 16, 'F');
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 16, pageW, 28, 'F');
 
-    // Header background
-    doc.setFillColor(15, 23, 42); // slate-950
-    doc.rect(0, 0, pageW, 40, 'F');
-
-    // Logo text
-    doc.setTextColor(16, 185, 129); // emerald
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('KAZ-SIGN', margin, 18);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text('Post-Quantum Verifiable Credential', margin, 26);
-    doc.text('did:kazsign  |  KAZ-SIGN-128 PQC Algorithm', margin, 32);
-
-    // Status badge
-    const statusColor = data.status === 'verified' ? [16,185,129]
-                      : data.status === 'revoked'  ? [249,115,22]
-                      : [59,130,246];
-    doc.setFillColor(...statusColor);
-    doc.roundedRect(pageW - margin - 30, 12, 30, 10, 2, 2, 'F');
     doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('KAZ-SIGN SYSTEM', margin, 10.5);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text('POST-QUANTUM DIGITAL CREDENTIAL AUTHORITY', pageW - margin, 10.5, { align: 'right' });
+
+    /* Title area */
+    doc.setTextColor(30, 30, 30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text((data.type || 'Verifiable Credential').toUpperCase(), margin, 28);
+
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text('ISSUED UNDER KAZ-SIGN-128 POST-QUANTUM CRYPTOGRAPHY', margin, 33);
+
+    /* Status */
+    const sc = data.status === 'verified' ? [26,122,74]
+             : data.status === 'revoked'  ? [160,64,0]
+             : [26,79,154];
+    doc.setFillColor(...sc);
+    doc.roundedRect(pageW - margin - 28, 20, 28, 9, 1, 1, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text(data.status.toUpperCase(), pageW - margin - 15, 18.5, { align: 'center' });
+    doc.text(data.status.toUpperCase(), pageW - margin - 14, 25.5, { align: 'center' });
 
-    y = 50;
+    y = 44;
 
-    // Credential type title
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(data.type || 'Verifiable Credential', margin, y);
-    y += 8;
-
-    // Divider
-    doc.setDrawColor(226, 232, 240);
+    /* Horizontal rule */
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.3);
     doc.line(margin, y, pageW - margin, y);
     y += 8;
 
-    // Two-column layout: details left, QR right
-    const detailW  = colW - 55;
-    const qrStartX = margin + detailW + 5;
-    const qrSize   = 48;
+    /* Certificate Serial (prominent) */
+    doc.setFillColor(255, 240, 230);
+    doc.rect(margin, y, colW, 20, 'F');
+    doc.setDrawColor(232, 101, 10);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin, y + 20);
+    doc.setTextColor(120, 60, 0);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('CERTIFICATE SERIAL NUMBER', margin + 8, y + 7);
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(196, 84, 10);
+    doc.text(data.certSerial || '—', margin + 8, y + 16);
+    y += 26;
 
-    // Generate QR code — encodes the Certificate Serial Number for verification
-    const qrContainer = document.getElementById('qr-container');
-    qrContainer.innerHTML = '';
+    /* QR Code */
+    const qrDiv = document.getElementById('qr-gen');
+    qrDiv.innerHTML = '';
     await new Promise(resolve => {
-        new QRCode(qrContainer, {
+        new QRCode(qrDiv, {
             text: data.certSerial || data.credId,
-            width: 200,
-            height: 200,
-            colorDark: '#0f172a',
-            colorLight: '#ffffff',
+            width: 180, height: 180,
+            colorDark: '#E8650A', colorLight: '#ffffff',
         });
         setTimeout(resolve, 300);
     });
-
-    const qrCanvas = qrContainer.querySelector('canvas');
+    const qrCanvas = qrDiv.querySelector('canvas');
+    const qrSize = 38;
     if (qrCanvas) {
-        const qrDataUrl = qrCanvas.toDataURL('image/png');
-        doc.addImage(qrDataUrl, 'PNG', qrStartX, y - 5, qrSize, qrSize);
+        doc.addImage(qrCanvas.toDataURL('image/png'), 'PNG', pageW - margin - qrSize, y - 4, qrSize, qrSize);
         doc.setFontSize(6);
-        doc.setTextColor(100, 116, 139);
-        doc.text('Scan to verify', qrStartX + qrSize / 2, y + qrSize - 1, { align: 'center' });
+        doc.setTextColor(150, 150, 150);
+        doc.text('Scan to verify', pageW - margin - qrSize / 2, y + qrSize - 1, { align: 'center' });
     }
 
-    // Subject details (left column)
+    /* Details table */
+    const detailW = colW - qrSize - 8;
     const fields = [];
-    if (data.certSerial) fields.push(['Certificate Serial No.', data.certSerial]);
     if (data.holderName) fields.push(['Holder Name', data.holderName]);
     if (data.issuerName) fields.push(['Issued By', data.issuerName]);
     fields.push(['Issue Date', data.issuedAt]);
-
-    // Add subject fields (skip id + certificateSerial — shown above)
     if (data.subject) {
-        const skip = ['id', 'certificateSerial', 'name'];
-        Object.entries(data.subject).forEach(([k, v]) => {
-            if (!skip.includes(k) && v) {
-                const label = k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
-                fields.push([label, String(v)]);
-            }
+        Object.entries(data.subject).forEach(([k,v]) => {
+            if (['id','certificateSerial','name'].includes(k) || !v) return;
+            const label = k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+            fields.push([label, String(v)]);
         });
     }
 
     doc.setFont('helvetica', 'normal');
-    fields.forEach(([label, value]) => {
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text(label.toUpperCase(), margin, y);
-        y += 4.5;
-        doc.setFontSize(9);
-        doc.setTextColor(15, 23, 42);
-        doc.setFont('helvetica', 'bold');
-        const lines = doc.splitTextToSize(value, detailW);
-        doc.text(lines, margin, y);
-        y += lines.length * 5 + 3;
-        doc.setFont('helvetica', 'normal');
-    });
-
-    y = Math.max(y, 50 + qrSize + 10);
-    y += 5;
-
-    // Divider
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, y, pageW - margin, y);
-    y += 8;
-
-    // DID Section
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.text('Decentralized Identifiers (DID)', margin, y);
-    y += 6;
-
-    [['Issuer DID', data.issuerDid], ['Holder DID', data.holderDid]].forEach(([label, value]) => {
-        if (!value || value === '—') return;
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text(label, margin, y);
-        y += 4;
+    fields.forEach(([lbl, val]) => {
         doc.setFontSize(7.5);
-        doc.setTextColor(16, 185, 129);
-        doc.setFont('helvetica', 'normal');
-        const lines = doc.splitTextToSize(value, colW);
+        doc.setTextColor(120, 120, 120);
+        doc.text(lbl.toUpperCase(), margin, y);
+        y += 5;
+        doc.setFontSize(10);
+        doc.setTextColor(26, 26, 26);
+        doc.setFont('helvetica', 'bold');
+        const lines = doc.splitTextToSize(val, detailW);
         doc.text(lines, margin, y);
-        y += lines.length * 4.5 + 3;
+        y += lines.length * 5 + 4;
+        doc.setFont('helvetica', 'normal');
     });
 
-    y += 3;
-    doc.setDrawColor(226, 232, 240);
+    y = Math.max(y, 44 + 26 + qrSize + 8);
+    y += 4;
+
+    /* DID section */
+    doc.setDrawColor(230,230,230);
     doc.line(margin, y, pageW - margin, y);
     y += 8;
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(26,26,26);
+    doc.text('Decentralized Identifiers', margin, y); y += 6;
+    [['Issuer DID', data.issuerDid], ['Holder DID', data.holderDid]].forEach(([lbl, did]) => {
+        if (!did || did === '—') return;
+        doc.setFontSize(7.5); doc.setTextColor(120,120,120); doc.text(lbl, margin, y); y += 4;
+        doc.setFontSize(7.5); doc.setTextColor(196,84,10); doc.setFont('courier','normal');
+        const lines = doc.splitTextToSize(did, colW);
+        doc.text(lines, margin, y); y += lines.length * 4.5 + 3;
+        doc.setFont('helvetica','normal');
+    });
 
-    // Certificate Serial No. (primary lookup key)
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.text('Certificate Serial Number', margin, y);
-    y += 5;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(16, 185, 129);
-    doc.text(data.certSerial || '—', margin, y);
-    y += 6;
-    doc.setFontSize(6.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
-    doc.text('Internal ID: ' + (data.credId || '—'), margin, y);
-    y += 8;
+    y += 2;
+    /* PQC notice */
+    doc.setFillColor(255,248,235);
+    doc.setDrawColor(224,168,0);
+    doc.setLineWidth(0.3);
+    doc.rect(margin, y, colW, 14, 'FD');
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(90,60,0);
+    doc.text('Post-Quantum Cryptography (PQC) — KAZ-SIGN-128', margin + 4, y + 6);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120,80,0);
+    doc.text('This credential is signed using KAZ-SIGN-128, a quantum-resistant digital signature algorithm.', margin + 4, y + 11);
+    y += 20;
 
-    // PQC notice box
-    doc.setFillColor(245, 243, 255);
-    doc.setDrawColor(167, 139, 250);
-    doc.roundedRect(margin, y, colW, 16, 2, 2, 'FD');
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(109, 40, 217);
-    doc.text('Post-Quantum Cryptography (PQC)', margin + 4, y + 6);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('Signed using KAZ-SIGN-128 algorithm. Quantum-resistant digital signature.', margin + 4, y + 11);
-    y += 22;
-
-    // Footer
-    doc.setFillColor(248, 250, 252);
+    /* Footer */
+    doc.setFillColor(245,245,245);
     doc.rect(0, 280, pageW, 17, 'F');
-    doc.setFontSize(7);
-    doc.setTextColor(148, 163, 184);
-    doc.text('This is a KAZ-SIGN Verifiable Credential. Verify at: ' + window.location.origin, margin, 287);
+    doc.setDrawColor(220,220,220);
+    doc.line(0, 280, pageW, 280);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150);
+    doc.text('KAZ-SIGN Digital Credential  |  ' + (data.certSerial || data.credId), margin, 287);
     doc.text('Generated: ' + new Date().toISOString().slice(0,19).replace('T',' '), pageW - margin, 287, { align: 'right' });
-    doc.text('KAZ-SIGN System  |  did:kazsign  |  PQC Secured', pageW / 2, 293, { align: 'center' });
+    doc.text('Verify at: ' + window.location.origin + '  |  Algorithm: KAZ-SIGN-128 PQC', pageW / 2, 293, { align: 'center' });
 
-    // Save
-    const fileName = 'KAZ-SIGN-Credential-' + (data.certSerial || data.holderName || 'Credential').replace(/\s+/g, '-') + '.pdf';
-    doc.save(fileName);
+    doc.save('KAZ-SIGN-Certificate-' + (data.certSerial || data.holderName || 'cred').replace(/\s+/g,'-') + '.pdf');
 }
 </script>
 </body>

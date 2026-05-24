@@ -1,97 +1,215 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Save Your Private Key — VeriTrust System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <style> body { font-family: 'JetBrains Mono', monospace; } </style>
+    <title>Save Private Key — KAZ-SIGN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --orange:       #E8650A;
+            --orange-light: #FFF0E6;
+            --orange-dark:  #C4540A;
+            --ink:          #1A1A1A;
+            --ink-mid:      #555555;
+            --ink-light:    #888888;
+            --rule:         #E0E0E0;
+            --surface:      #FAFAFA;
+            --white:        #FFFFFF;
+        }
+        body {
+            font-family: 'Barlow', sans-serif;
+            background: var(--surface); color: var(--ink);
+            min-height: 100vh; display: flex; flex-direction: column;
+        }
+        .top-stripe { height: 4px; background: var(--orange); }
+        .site-header {
+            background: var(--white); border-bottom: 1px solid var(--rule);
+            padding: 0 48px; height: 60px; display: flex; align-items: center; gap: 12px;
+        }
+        .logo-mark {
+            width: 32px; height: 32px; background: var(--orange);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+            font-size: 14px; color: var(--white);
+        }
+        .brand {
+            font-family: 'Barlow Condensed', sans-serif; font-weight: 600;
+            font-size: 18px; letter-spacing: 2px; color: var(--ink); text-transform: uppercase;
+        }
+        .step-indicator {
+            margin-left: auto; font-size: 11px; color: var(--ink-light);
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .page-content {
+            flex: 1; display: flex; align-items: center;
+            justify-content: center; padding: 48px 24px;
+        }
+        .content-wrap { width: 100%; max-width: 560px; }
+
+        .alert-banner {
+            background: #FFF8E6; border: 1px solid #F0C060;
+            border-left: 4px solid #E0A800;
+            padding: 16px 20px; display: flex; gap: 14px;
+            margin-bottom: 24px;
+        }
+        .alert-icon { font-size: 20px; flex-shrink: 0; }
+        .alert-body h3 {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700; font-size: 16px; letter-spacing: 0.5px;
+            color: #5A3E00; margin-bottom: 4px; text-transform: uppercase;
+        }
+        .alert-body p { font-size: 12px; color: #7A5A00; line-height: 1.6; }
+
+        .key-card {
+            background: var(--white); border: 1px solid var(--rule);
+            border-top: 3px solid var(--orange); padding: 32px; margin-bottom: 24px;
+        }
+        .key-card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .key-card-title {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700; font-size: 16px; letter-spacing: 1px;
+            text-transform: uppercase; color: var(--ink);
+        }
+        .btn-copy {
+            background: var(--white); border: 1px solid var(--rule);
+            color: var(--ink-mid); font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+            text-transform: uppercase; padding: 6px 14px; cursor: pointer;
+            transition: all 0.12s; border-radius: 2px;
+        }
+        .btn-copy:hover { border-color: var(--orange); color: var(--orange); }
+        .btn-copy.copied { border-color: #1A7A4A; color: #1A7A4A; }
+
+        .key-display {
+            width: 100%;
+            background: #F7F7F7;
+            border: 1px solid var(--rule);
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.8;
+            color: var(--orange-dark);
+            word-break: break-all;
+            white-space: pre-wrap;
+            resize: none;
+            outline: none;
+        }
+        .key-tip {
+            font-size: 11px; color: var(--ink-light); margin-top: 8px;
+        }
+
+        .confirm-card {
+            background: var(--white); border: 1px solid var(--rule); padding: 28px;
+        }
+        .confirm-check-row {
+            display: flex; gap: 12px; align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .confirm-check-row input[type="checkbox"] {
+            width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0;
+            accent-color: var(--orange); cursor: pointer;
+        }
+        .confirm-check-row label {
+            font-size: 13px; color: var(--ink-mid); line-height: 1.6; cursor: pointer;
+        }
+        .confirm-check-row label strong { color: var(--ink); font-weight: 500; }
+
+        .btn-continue {
+            width: 100%; background: var(--orange); color: var(--white);
+            border: none; padding: 13px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 15px; font-weight: 700; letter-spacing: 2px;
+            text-transform: uppercase; cursor: pointer;
+            transition: background 0.15s; border-radius: 2px;
+        }
+        .btn-continue:hover { background: var(--orange-dark); }
+        .btn-continue:disabled { background: #CCCCCC; cursor: not-allowed; }
+
+        .site-footer {
+            background: var(--white); border-top: 1px solid var(--rule);
+            padding: 14px 48px; display: flex; justify-content: space-between;
+        }
+        .site-footer span { font-size: 11px; color: var(--ink-light); }
+    </style>
 </head>
-<body class="min-h-full bg-slate-950 text-slate-100 flex items-center justify-center px-4 py-12">
+<body>
+<div class="top-stripe"></div>
 
-<div class="w-full max-w-xl space-y-6">
+<header class="site-header">
+    <div class="logo-mark">KZ</div>
+    <span class="brand">KAZ-SIGN</span>
+    <span class="step-indicator">Step 2 of 2 &mdash; Save Your Key</span>
+</header>
 
-    <!-- Logo -->
-    <div class="text-center space-y-2">
-        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold text-lg">VT</span>
-        <h1 class="text-xl font-semibold tracking-widest">Veri&#8209;Trust</h1>
-    </div>
+<div class="page-content">
+    <div class="content-wrap">
 
-    <!-- Warning banner -->
-    <div class="flex gap-3 rounded-xl border border-yellow-700 bg-yellow-900/20 px-5 py-4">
-        <span class="text-yellow-400 text-lg mt-0.5">⚠</span>
-        <div class="space-y-1 text-xs">
-            <p class="font-semibold text-yellow-300">Save your private key now — this is the only time it will be shown.</p>
-            <p class="text-yellow-600">It is never stored on the server. If you lose it, you will not be able to sign new documents and must register a new account.</p>
-        </div>
-    </div>
-
-    <!-- Private key box -->
-    <div class="rounded-xl border border-slate-700 bg-slate-900 p-6 space-y-4">
-        <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Your Private Key</h2>
-            <button id="copy-btn"
-                    onclick="copyKey()"
-                    class="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800
-                           px-3 py-1.5 text-[11px] font-semibold text-slate-300
-                           hover:border-emerald-600 hover:text-emerald-300 transition-all">
-                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
-                </svg>
-                Copy
-            </button>
+        <div class="alert-banner">
+            <span class="alert-icon">⚠</span>
+            <div class="alert-body">
+                <h3>Action Required — Save This Key Now</h3>
+                <p>Your private key is displayed below <strong>one time only</strong>. It is never stored on this server.
+                If you lose it, you will need to create a new account to sign credentials again.</p>
+            </div>
         </div>
 
-        <textarea id="private-key-display"
-                  readonly
-                  rows="6"
-                  class="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-3
-                         text-[11px] text-emerald-300 leading-relaxed resize-none
-                         focus:outline-none select-all"><?= htmlspecialchars($private_key ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
+        <div class="key-card">
+            <div class="key-card-header">
+                <span class="key-card-title">Your Private Key (KAZ-SIGN-128)</span>
+                <button class="btn-copy" id="copy-btn" onclick="copyKey()">Copy Key</button>
+            </div>
 
-        <p class="text-[10px] text-slate-600">
-            Tip: Save this in a password manager, an encrypted file, or a secure note.
-        </p>
+            <textarea id="key-display" class="key-display" rows="6" readonly
+                      onclick="this.select()"><?= htmlspecialchars($private_key ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
+
+            <p class="key-tip">&#8594; Click the key to select all. Save to a password manager or encrypted file immediately.</p>
+        </div>
+
+        <div class="confirm-card">
+            <form action="<?= $base ?>/key/confirm" method="POST">
+                <input type="hidden" name="csrf_token"
+                       value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
+
+                <div class="confirm-check-row">
+                    <input type="checkbox" id="saved-confirm" required />
+                    <label for="saved-confirm">
+                        I confirm I have <strong>saved my private key</strong> in a secure location.
+                        I understand that it cannot be recovered and losing it means losing signing access.
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-continue">Continue to Dashboard</button>
+            </form>
+        </div>
+
     </div>
-
-    <!-- Confirm & continue -->
-    <form action="<?= $base ?>/key/confirm" method="POST">
-        <input type="hidden" name="csrf_token"
-               value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>" />
-
-        <label class="flex items-start gap-3 cursor-pointer mb-4">
-            <input id="saved-check" type="checkbox" required
-                   class="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 accent-emerald-500" />
-            <span class="text-xs text-slate-400">
-                I have saved my private key in a safe place and understand I cannot recover it if lost.
-            </span>
-        </label>
-
-        <button type="submit"
-                class="w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-xs font-bold uppercase
-                       tracking-widest text-slate-950 hover:bg-emerald-400 active:scale-95
-                       transition-all duration-150">
-            I've Saved It — Continue to Dashboard
-        </button>
-    </form>
-
 </div>
+
+<footer class="site-footer">
+    <span>KAZ-SIGN System &mdash; Post-Quantum Digital Credentials</span>
+    <span>Role: <?= htmlspecialchars(ucfirst($role ?? 'user'), ENT_QUOTES, 'UTF-8') ?></span>
+</footer>
 
 <script>
 function copyKey() {
-    const ta  = document.getElementById('private-key-display');
+    const ta = document.getElementById('key-display');
     const btn = document.getElementById('copy-btn');
     ta.select();
     navigator.clipboard.writeText(ta.value).then(() => {
         btn.textContent = '✓ Copied!';
-        btn.classList.add('text-emerald-400', 'border-emerald-600');
-        setTimeout(() => { btn.innerHTML = `<svg class="h-3 w-3 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>Copy`; btn.classList.remove('text-emerald-400','border-emerald-600'); }, 2000);
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy Key';
+            btn.classList.remove('copied');
+        }, 2500);
     });
 }
 </script>
-
 </body>
 </html>
