@@ -44,7 +44,7 @@ $credentialFields = [
         <div class="flex h-14 items-center justify-between">
             <a href="<?= $base ?>/" class="flex items-center gap-2.5 hover:opacity-80">
                 <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs">KZ</span>
-                <span class="text-sm font-semibold tracking-widest">KAZ&#8209;SIGN</span>
+                <span class="text-sm font-semibold tracking-widest">Veri&#8209;Trust</span>
             </a>
             <div class="flex items-center gap-4">
                 <span class="inline-flex items-center gap-1.5 rounded-full border <?= $roleColor ?> px-2.5 py-0.5 text-[10px] font-semibold capitalize">
@@ -552,7 +552,7 @@ function toggleJsonLd(id, btn) {
 function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
         const orig = btn.textContent;
-        btn.textContent = '✓ Copied!';
+        btn.textContent = 'Copied!';
         setTimeout(() => btn.textContent = orig, 2000);
     });
 }
