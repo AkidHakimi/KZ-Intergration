@@ -456,7 +456,9 @@ $credentialFields = [
         <span class="role-pill <?= $role ?>"><?= ucfirst($role) ?></span>
         <?php if ($hasKey): ?>
             <span class="pqc-pill">PQC Signing On</span>
-
+        <?php else: ?>
+           // <span class="pqc-pill off"></span>
+        <?php endif; ?>
         <div class="nav-user">
             <span class="nav-username"><?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?></span>
             <a href="<?= $base ?>/logout" class="nav-logout">Logout</a>
